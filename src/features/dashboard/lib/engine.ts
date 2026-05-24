@@ -1,7 +1,17 @@
-import type { RaidPlan, MapRecommendation, LoadoutSuggestion, PrioritizedPOI, WatchlistItem, RiskIndicator } from './types';
+import type {
+  RaidPlan,
+  MapRecommendation,
+  LoadoutSuggestion,
+  PrioritizedPOI,
+  WatchlistItem,
+  RiskIndicator,
+  VibeIntelData,
+} from './types';
 import type { ProgressData } from '@/lib/api/tarkov-tracker/types';
 import type { TarkovTask, TarkovMap } from '@/lib/api/tarkov-dev/types';
 import type { VibeModifier } from '@/features/vibes/types';
+import { getBossIntel } from './boss-intel';
+import { getCombatProtocols } from './combat-protocols';
 
 // ── Map Scoring ────────────────────────────────────────────────────
 
@@ -196,6 +206,47 @@ function assessRisks(mapName: string, maps: TarkovMap[]): RiskIndicator[] {
   return risks;
 }
 
+// ── Vibe Intel Data ────────────────────────────────────────────────
+
+function computeVibeIntelData(
+  vibe: VibeModifier,
+  mapName: string,
+  questCount: number,
+  topBossSpawnChance: number,
+  hasGoonSighting: boolean,
+  maps: TarkovMap[]
+): VibeIntelData {
+  switch (vibe.intelCard) {
+    case 'quick-analysis': {
+      // Loot Density: clamp(questCount × 12, 0, 100) → ~8 quests fills the bar.
+      const lootDensity = Math.max(0, Math.min(100, Math.round(questCount * 12)));
+      // Survival: inverse of danger heuristic — high boss chance + goons → low.
+      const dangerSignal = topBossSpawnChance * 0.7 + (hasGoonSighting ? 0.3 : 0);
+      const survivalProbability = Math.max(
+        10,
+        Math.min(95, Math.round((1 - dangerSignal) * 100))
+      );
+      return { kind: 'quick-analysis', lootDensity, survivalProbability };
+    }
+    case 'boss-encounter': {
+      const mapData = maps.find((m) => m.name === mapName);
+      const topBoss = mapData?.bosses.reduce<{ name: string; spawnChance: number } | null>(
+        (best, b) => (!best || b.spawnChance > best.spawnChance ? b : best),
+        null
+      );
+      const bossName = topBoss?.name ?? null;
+      const intel = bossName ? getBossIntel(mapName, bossName) : null;
+      return { kind: 'boss-encounter', bossName, mapName, intel };
+    }
+    case 'combat-strategy':
+      return {
+        kind: 'combat-strategy',
+        mapName,
+        protocols: getCombatProtocols(mapName, hasGoonSighting),
+      };
+  }
+}
+
 // ── Main Engine ────────────────────────────────────────────────────
 
 export interface TeamImpact {
@@ -214,7 +265,8 @@ export function computeRaidPlan(
   tasks: TarkovTask[],
   maps: TarkovMap[],
   vibeModifier: VibeModifier,
-  teammates: ProgressData[]
+  teammates: ProgressData[],
+  hasGoonSighting = false
 ): RaidPlanResult {
   const playerOpenTaskIds = new Set(
     progress.tasksProgress
@@ -252,6 +304,19 @@ export function computeRaidPlan(
   const watchlist = buildWatchlist(tasks, playerOpenTaskIds, vibeModifier);
   const risks = assessRisks(bestMap.mapName, maps);
 
+  const topBossSpawnChance = (bestMapData?.bosses ?? []).reduce(
+    (max, b) => Math.max(max, b.spawnChance),
+    0
+  );
+  const vibeIntelData = computeVibeIntelData(
+    vibeModifier,
+    bestMap.mapName,
+    bestMap.questCount,
+    topBossSpawnChance,
+    hasGoonSighting,
+    maps
+  );
+
   // Team impact
   const teamImpact: TeamImpact[] = [];
   for (const teammate of teammates) {
@@ -271,7 +336,7 @@ export function computeRaidPlan(
   }
 
   return {
-    plan: { map: mapRec, loadout, pois, watchlist, risks },
+    plan: { map: mapRec, loadout, pois, watchlist, risks, vibeIntelData },
     teamImpact: teamImpact.sort((a, b) => b.questCount - a.questCount),
     mapScores: mapScores.slice(0, 5),
   };

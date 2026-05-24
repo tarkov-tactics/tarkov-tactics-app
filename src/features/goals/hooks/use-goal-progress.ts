@@ -11,9 +11,18 @@ import {
   DEFAULT_PRESTIGE_TARGET,
   type PrestigeTarget,
 } from '../lib/prestige-tiers';
+import {
+  ALL_SCOPE,
+  filterTasksByScope,
+  getScopeOptions,
+  isValidScopeForGoal,
+  type ScopeId,
+  type ScopeOption,
+} from '../lib/directive-scopes';
 
 const STORAGE_KEY = 'active-goal';
 const PRESTIGE_TARGET_KEY = 'prestige-target';
+const SCOPE_KEY_PREFIX = 'directive-scope:';
 
 function readGoal(): GoalId | null {
   if (typeof window === 'undefined') return null;
@@ -32,6 +41,15 @@ function readPrestigeTarget(): PrestigeTarget {
     if (n >= 1 && n <= 6) return n as PrestigeTarget;
     return DEFAULT_PRESTIGE_TARGET;
   } catch { return DEFAULT_PRESTIGE_TARGET; }
+}
+
+function readScope(goalId: GoalId): ScopeId {
+  if (typeof window === 'undefined') return ALL_SCOPE.id;
+  try {
+    const stored = localStorage.getItem(SCOPE_KEY_PREFIX + goalId);
+    if (stored && isValidScopeForGoal(goalId, stored)) return stored;
+    return ALL_SCOPE.id;
+  } catch { return ALL_SCOPE.id; }
 }
 
 // ── Per-goal task filtering ─────────────────────────────────────
@@ -93,6 +111,13 @@ function computeGoalProgress(
   prestigeTarget: PrestigeTarget,
 ): GoalProgress {
   const goalTasks = getGoalTasks(goalId, allTasks, progress, prestigeTarget);
+  return computeProgressForTasks(goalTasks, progress);
+}
+
+function computeProgressForTasks(
+  goalTasks: TarkovTask[],
+  progress: ProgressData | null,
+): GoalProgress {
   const total = goalTasks.length;
 
   if (!progress || total === 0) {
@@ -121,6 +146,14 @@ function computeGoalProgress(
 export function useGoalState() {
   const [activeGoal, setActiveGoalState] = useState<GoalId | null>(() => readGoal());
   const [prestigeTarget, setPrestigeTargetState] = useState<PrestigeTarget>(() => readPrestigeTarget());
+  // Scope per goal — stored as a Map so each goal's last scope survives switches.
+  const [scopeByGoal, setScopeByGoal] = useState<Record<GoalId, ScopeId>>(() => ({
+    prestige: readScope('prestige'),
+    kappa: readScope('kappa'),
+    'story-endings': readScope('story-endings'),
+    lightkeeper: readScope('lightkeeper'),
+  }));
+
   const { progress } = usePlayerState();
   const { tasks: gameTasks, dataLoaded } = useGameData();
 
@@ -132,6 +165,12 @@ export function useGoalState() {
   const setPrestigeTarget = useCallback((target: PrestigeTarget) => {
     setPrestigeTargetState(target);
     try { localStorage.setItem(PRESTIGE_TARGET_KEY, String(target)); } catch { /* noop */ }
+  }, []);
+
+  const setDirectiveScope = useCallback((goalId: GoalId, scopeId: ScopeId) => {
+    const next = isValidScopeForGoal(goalId, scopeId) ? scopeId : ALL_SCOPE.id;
+    setScopeByGoal((prev) => ({ ...prev, [goalId]: next }));
+    try { localStorage.setItem(SCOPE_KEY_PREFIX + goalId, next); } catch { /* noop */ }
   }, []);
 
   const goalDefinition: GoalDefinition | null =
@@ -150,6 +189,18 @@ export function useGoalState() {
     ? allGoalProgress.get(activeGoal) ?? null
     : null;
 
+  const directiveScope: ScopeId = activeGoal ? scopeByGoal[activeGoal] : ALL_SCOPE.id;
+
+  const scopeOptions: ScopeOption[] = activeGoal ? getScopeOptions(activeGoal) : [ALL_SCOPE];
+
+  const scopedProgress = useMemo<GoalProgress | null>(() => {
+    if (!activeGoalProgress || !activeGoal) return null;
+    if (directiveScope === ALL_SCOPE.id) return activeGoalProgress;
+    const filteredOpen = filterTasksByScope(activeGoal, directiveScope, activeGoalProgress.openTasks);
+    const filteredDone = filterTasksByScope(activeGoal, directiveScope, activeGoalProgress.completedTasks);
+    return computeProgressForTasks([...filteredOpen, ...filteredDone], progress);
+  }, [activeGoal, directiveScope, activeGoalProgress, progress]);
+
   return {
     activeGoal,
     setActiveGoal,
@@ -159,5 +210,15 @@ export function useGoalState() {
     gameDataLoaded: dataLoaded,
     prestigeTarget,
     setPrestigeTarget,
+    directiveScope,
+    setDirectiveScope: useCallback(
+      (scopeId: ScopeId) => {
+        if (!activeGoal) return;
+        setDirectiveScope(activeGoal, scopeId);
+      },
+      [activeGoal, setDirectiveScope]
+    ),
+    scopeOptions,
+    scopedProgress,
   };
 }

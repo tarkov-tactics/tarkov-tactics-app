@@ -6,7 +6,8 @@ import { GoalCard } from "@/features/goals/components/goal-card";
 import { ActiveDirectiveFocus } from "@/features/goals/components/active-directive-focus";
 import { ProgressionSummary } from "@/features/goals/components/progression-summary";
 import { OpenQuestsPreview } from "@/features/goals/components/open-quests-preview";
-import { TarkovTrackerHomeLink } from "@/features/goals/components/tarkov-tracker-home-link";
+import { DirectiveScopeFilter } from "@/features/goals/components/directive-scope-filter";
+import { TarkovTrackerProfileLink } from "@/features/goals/components/tarkov-tracker-profile-link";
 import { GOALS } from "@/features/goals/types";
 import { PageHeader } from "@/components/layout/page-header";
 
@@ -20,6 +21,10 @@ export default function GoalsPage() {
     gameDataLoaded,
     prestigeTarget,
     setPrestigeTarget,
+    directiveScope,
+    setDirectiveScope,
+    scopeOptions,
+    scopedProgress,
   } = useGoalState();
   const { isConnected, progress } = usePlayerState();
 
@@ -27,7 +32,7 @@ export default function GoalsPage() {
   // goal selected yet — the focus card always renders so the page never looks
   // empty.
   const focusGoal = goalDefinition ?? GOALS[0];
-  const focusProgress = activeGoalProgress;
+  const focusProgress = scopedProgress ?? activeGoalProgress;
 
   return (
     <div className="p-4 md:p-6 lg:p-8">
@@ -35,7 +40,7 @@ export default function GoalsPage() {
         <PageHeader
           title="Directives"
           subtitle="Track your long-term progression and shape raid recommendations."
-          actions={isConnected ? <TarkovTrackerHomeLink /> : undefined}
+          actions={isConnected ? <TarkovTrackerProfileLink /> : undefined}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
@@ -52,12 +57,18 @@ export default function GoalsPage() {
             />
           </div>
 
-          {/* Sidebar column: Progression Summary + Open Quests */}
+          {/* Sidebar column: Scope filter + Progression Summary + Open Quests */}
           <aside className="lg:col-span-4 flex flex-col gap-4 lg:gap-6 min-w-0">
+            <DirectiveScopeFilter
+              options={scopeOptions}
+              value={directiveScope}
+              onChange={setDirectiveScope}
+            />
             <ProgressionSummary
-              allGoalProgress={allGoalProgress}
               activeGoal={activeGoal}
-              onSelect={setActiveGoal}
+              activeGoalProgress={activeGoalProgress}
+              currentScope={directiveScope}
+              onScopeSelect={setDirectiveScope}
             />
             <OpenQuestsPreview
               openTasks={focusProgress?.openTasks ?? []}

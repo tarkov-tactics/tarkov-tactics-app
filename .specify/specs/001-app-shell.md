@@ -33,7 +33,7 @@ The shell adopts the **Tarkov Tactical Interface (TTI)** visual language: the si
 | `Sidebar` | `components/layout/sidebar.tsx` | Client | Operator identity (top) → nav links → settings/logout footer. Collapsible to icon-only at 64px on tablet, drawer on mobile. |
 | `OperatorIdentity` | `components/layout/operator-identity.tsx` | Client | Avatar + display name + "PMC LEVEL XX" telemetry label. Lives at the top of the sidebar. Falls back to "NOT CONNECTED" state when disconnected. |
 | `Header` | `components/layout/header.tsx` | Client | Sticky top bar. **Mobile**: menu trigger + branding + compact connection chip. **Desktop**: empty (sidebar carries identity + nav; the page's `PageHeader` carries the title). No global refresh button — manual refresh lives in Settings; data auto-refreshes on app load. |
-| `PageHeader` | `components/layout/page-header.tsx` | Server | Shared page chrome: tactical title (uppercase, tracking-tight, `text-2xl lg:text-3xl`) + subtitle (`text-sm text-muted-foreground`, sentence case) + right-aligned `actions` slot. Used by every primary page. Renders inside the page's outer padding container; stacks vertically on mobile. |
+| `PageHeader` | `components/layout/page-header.tsx` | Server | Shared page chrome: tactical title (uppercase, tracking-tight, `text-2xl lg:text-3xl`) + optional subtitle pill (e.g., "DIRECTIVES") + sentence-case subtitle line + right-aligned `actions` slot. Used by every primary page. Renders inside the page's outer padding container; stacks vertically on mobile. |
 | `MobileNav` | `components/layout/mobile-nav.tsx` | Client | Sheet/drawer navigation for small screens |
 
 ## Requirements
@@ -47,7 +47,11 @@ The shell adopts the **Tarkov Tactical Interface (TTI)** visual language: the si
 - [ ] Header de-emphasized on desktop — no duplicate branding, no player chip, **no refresh button**. The page's `PageHeader` provides identity. Desktop header is visually empty (sticky structure preserved for layout).
 - [ ] Mobile header carries: menu trigger, "TT" branding, compact connection chip (linked to Settings)
 - [ ] No global refresh control on any page header. Player + team data **auto-refresh on app load** via the provider mount effect (already implemented in `PlayerStateProvider` / `TeamStateProvider`). Manual refresh lives on the Settings page — see spec-002.
-- [ ] `PageHeader` component renders: uppercase tactical title (e.g., "INTEL BRIEFING", "DIRECTIVES"), subtitle line (telemetry style), and right-aligned `actions` slot for inline selectors / CTAs
+- [ ] `PageHeader` component renders: uppercase tactical title (e.g., "INTEL BRIEFING"), optional subtitle pill (e.g., "DIRECTIVES" on the Goals page), telemetry subtitle line, and right-aligned `actions` slot for inline selectors / CTAs
+- [ ] **`PageHeader.actions` usage** per page:
+  - **Dashboard** (`/`): `LabeledSelector` ×2 → "SELECT VIBE" + "ACTIVE DIRECTIVE" (see spec-005 / spec-006).
+  - **Directives** (`/goals`): single primary-styled `TarkovTrackerProfileLink` ("View Profile on TarkovTracker.org"). The `DirectiveScopeFilter` is rendered **inside** the right side column, not in the header (see spec-004).
+  - **Team** (`/team`), **Settings** (`/settings`): no `actions` slot content.
 - [x] Content area fills remaining space and scrolls independently
 - [ ] App uses **Hanken Grotesk** as the primary UI font and **Geist** as the telemetry/mono font (via `next/font/google`)
 - [ ] Telemetry label utility class available globally (10px Geist, weight 600, uppercase, `tracking-widest`)

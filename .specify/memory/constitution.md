@@ -123,7 +123,8 @@ All app colors come from CSS variables. Code never hard-codes hex.
 - **Tactical Card** — `bg-card`, `border border-border`, `rounded-lg`, 16–20px internal padding. Header may include a telemetry label in the top corner.
 - **Status pill badge** — `rounded-full`, `bg-{state}/10`, `border border-{state}/20`, mono text, high contrast.
 - **Progress bar** — `bg-muted` track, `bg-primary` fill, 2–3px height, sharp edges or minimally rounded.
-- **Labeled selector** — small telemetry label above a compact button with chevron (used in "INTEL BRIEFING" header for Vibe + Directive switching).
+- **Labeled selector** — small telemetry label above a compact button with chevron (used in "INTEL BRIEFING" header for Vibe + Directive switching, and in the Directives side column for scope filtering).
+- **Card density variants** — tactical cards that appear in more than one dashboard slot expose a `variant` prop (typically `'hero' | 'compact'`; Loadout adds `'kit-detailed'`; Threat Assessment exposes an orthogonal `format: 'tiles' | 'rows' | 'bars'`). The variant is assigned by the active layout composition, NOT inferred from screen size — mobile keeps the assigned variant. One component, multiple densities; no per-vibe duplicate components.
 
 ### Reference
 - Visual exports: `stitch-import/tarkov_tactical_interface/DESIGN.md` (tokens), `stitch-import/*/code.html` (reference markup), `stitch-import/*/screen.png` (target renders).

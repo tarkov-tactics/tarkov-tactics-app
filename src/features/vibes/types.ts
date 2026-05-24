@@ -1,9 +1,12 @@
 export type VibeId = 'loot-run' | 'pvp-mixed' | 'boss-rush';
 
+export type VibeIntelCard = 'quick-analysis' | 'boss-encounter' | 'combat-strategy';
+
 export interface VibeModifier {
   poiPriority: 'loot' | 'quest' | 'boss';
   gearBudgetMultiplier: number;
   riskTolerance: 'low' | 'high';
+  intelCard: VibeIntelCard;
 }
 
 export interface VibeDefinition {
@@ -20,20 +23,35 @@ export const VIBES: VibeDefinition[] = [
     name: 'Loot Run',
     icon: '💰',
     description: 'Safe routes, high value-per-slot, budget gear. Minimize risk-per-death.',
-    modifier: { poiPriority: 'loot', gearBudgetMultiplier: 0.3, riskTolerance: 'low' },
+    modifier: {
+      poiPriority: 'loot',
+      gearBudgetMultiplier: 0.3,
+      riskTolerance: 'low',
+      intelCard: 'quick-analysis',
+    },
   },
   {
     id: 'pvp-mixed',
     name: 'PvP / Mixed',
     icon: '⚔️',
     description: 'Maximum quest progress, meta gear, high quest density maps.',
-    modifier: { poiPriority: 'quest', gearBudgetMultiplier: 1.0, riskTolerance: 'high' },
+    modifier: {
+      poiPriority: 'quest',
+      gearBudgetMultiplier: 1.0,
+      riskTolerance: 'high',
+      intelCard: 'combat-strategy',
+    },
   },
   {
     id: 'boss-rush',
     name: 'Boss Rush',
     icon: '👹',
     description: 'Hunt bosses. Optimized by spawn chance, tailored loadouts.',
-    modifier: { poiPriority: 'boss', gearBudgetMultiplier: 1.2, riskTolerance: 'high' },
+    modifier: {
+      poiPriority: 'boss',
+      gearBudgetMultiplier: 1.2,
+      riskTolerance: 'high',
+      intelCard: 'boss-encounter',
+    },
   },
 ];

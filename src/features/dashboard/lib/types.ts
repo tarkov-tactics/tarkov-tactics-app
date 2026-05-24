@@ -1,9 +1,13 @@
+import type { BossIntel } from './boss-intel';
+import type { CombatProtocol } from './combat-protocols';
+
 export interface RaidPlan {
   map: MapRecommendation;
   loadout: LoadoutSuggestion;
   pois: PrioritizedPOI[];
   watchlist: WatchlistItem[];
   risks: RiskIndicator[];
+  vibeIntelData: VibeIntelData;
 }
 
 export interface MapRecommendation {
@@ -21,6 +25,24 @@ export interface LoadoutSuggestion {
   rig: string;
   estimatedBudget: number;
 }
+
+/**
+ * Discriminated payload consumed by the active vibe's intel card on the
+ * dashboard. Discriminator matches `VibeModifier.intelCard`.
+ */
+export type VibeIntelData =
+  | { kind: 'quick-analysis'; lootDensity: number; survivalProbability: number }
+  | {
+      kind: 'boss-encounter';
+      bossName: string | null;
+      mapName: string;
+      intel: BossIntel | null;
+    }
+  | {
+      kind: 'combat-strategy';
+      mapName: string;
+      protocols: CombatProtocol[];
+    };
 
 export interface PrioritizedPOI {
   name: string;

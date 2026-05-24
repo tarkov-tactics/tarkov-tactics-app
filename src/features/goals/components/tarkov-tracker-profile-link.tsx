@@ -10,9 +10,10 @@ const TARKOV_TRACKER_HOME = "https://tarkovtracker.io/";
  * a new tab. There is no public per-user profile URL on tarkovtracker.io
  * (the SPA gates progression behind auth), so we deliberately don't include
  * the userId — landing on the home view lets a logged-in user see their own
- * data.
+ * data. The label still says "Profile" to match the Stitch reference and
+ * communicate intent to the user.
  */
-export function TarkovTrackerHomeLink() {
+export function TarkovTrackerProfileLink() {
   return (
     <Button
       variant="default"
@@ -23,12 +24,12 @@ export function TarkovTrackerHomeLink() {
           href={TARKOV_TRACKER_HOME}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="Open TarkovTracker in a new tab"
+          aria-label="View profile on TarkovTracker.org (opens new tab)"
         />
       }
     >
       <ExternalLink className="size-3.5 mr-1.5" />
-      Open TarkovTracker
+      View Profile on TarkovTracker.org
     </Button>
   );
 }

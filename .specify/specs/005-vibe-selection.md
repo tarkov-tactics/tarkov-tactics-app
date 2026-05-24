@@ -33,6 +33,12 @@ Let the player pick their current "Vibe" — their short-term raid intent. The v
   - `poiPriority` — 'loot' | 'quest' | 'boss'
   - `gearBudgetMultiplier` — 0.3 (budget) to 1.5 (meta)
   - `riskTolerance` — affects POI risk filtering
+  - `intelCard` — `'quick-analysis' | 'boss-encounter' | 'combat-strategy'` — names the vibe-specific dashboard intel card (consumed by spec-006's Layout Composition map). Each vibe defines exactly one.
+- `vibeIntelData` — the engine payload that the active vibe's `intelCard` consumes. Shape is discriminated by `intelCard`:
+  - `quick-analysis` → `{ lootDensity: 0–100, survivalProbability: 0–100 }`
+  - `boss-encounter` → `{ bossId, spawnPoints, guardStatus, uniqueLoot, tacticalApproach, flankManeuvers }`
+  - `combat-strategy` → `{ protocols: { title, body }[] }`
+  - Computed inside `useRaidPlan()` (spec-006) so the dashboard can render the card without each card fetching its own data.
 - **Team-Aware**:
   - `vibeTeamImpact` — for each vibe, how many shared tasks exist on that vibe's preferred maps
   - Used in the modifier summary to help squad leaders pick the best vibe for the group
@@ -44,6 +50,7 @@ Let the player pick their current "Vibe" — their short-term raid intent. The v
 - **Loadout**: Budget gear (minimize risk-per-death)
 - **POI priority**: High value-per-slot items, minimal key requirements
 - **Risk tolerance**: Low
+- **Intel card**: `quick-analysis` — surfaces Loot Density + Survival Probability meters in the sidebar
 - **Team context**: "X shared quests on preferred maps"
 
 ### ⚔️ PvP / Mixed
@@ -51,6 +58,7 @@ Let the player pick their current "Vibe" — their short-term raid intent. The v
 - **Loadout**: Meta gear based on available trader levels
 - **POI priority**: Quest objectives first, boss encounters acceptable
 - **Risk tolerance**: High
+- **Intel card**: `combat-strategy` — surfaces CQB Protocol + Anti-Goon Maneuver tactical notes at the bottom of the left column
 - **Team context**: "X shared quests on preferred maps"
 
 ### 👹 Boss Rush
@@ -58,6 +66,7 @@ Let the player pick their current "Vibe" — their short-term raid intent. The v
 - **Loadout**: Tailored to specific boss types (e.g., face shield for Killa)
 - **POI priority**: Boss spawn locations primary, quest items at boss POIs secondary
 - **Risk tolerance**: High
+- **Intel card**: `boss-encounter` — surfaces Spawn Points / Guard Status / Unique Loot + Tactical Approach + Flank Maneuvers in row 2 of the hero column
 - **Team context**: "X shared quests on preferred maps"
 
 ## UI Components
@@ -76,6 +85,7 @@ Let the player pick their current "Vibe" — their short-term raid intent. The v
 - [x] Switching vibe triggers Dashboard recalculation (via shared state/context)
 - [x] `useVibeConfig()` hook provides `activeVibe` and `vibeModifier` to any component
 - [x] No dedicated `/vibes` route — removed
+- [ ] **`VibeDefinition.intelCard`** — every vibe definition in `features/vibes/types.ts` declares exactly one `intelCard` value. The dashboard's `useRaidPlan()` reads this to compute `vibeIntelData` and the layout composition map (spec-006) reads it to slot the right intel card.
 - [ ] **Team impact** — when team data is available, the engine still weights vibe-specific map preferences against teammate overlap. The user doesn't see a "team impact" indicator on the Vibe selector itself (no room in the trigger). Team benefit shows up in the dashboard cards (`teamImpact` badge on Map Recommendation, Team Impact panel). When team data is unavailable, those indicators are hidden — no errors.
 
 ### Non-Functional
@@ -89,6 +99,7 @@ Let the player pick their current "Vibe" — their short-term raid intent. The v
 - [ ] Selection persists across reloads
 - [ ] `useVibeConfig()` returns correct modifier values for each vibe
 - [ ] Quick switch works from the Dashboard without navigating away
+- [ ] Switching vibes swaps the intel card on the dashboard (Loot Run → QuickAnalysis, PvP → CombatStrategy, Boss Rush → BossEncounter) with no flash of the wrong card
 - [ ] Team impact lines show correct shared quest counts when team data is available
 - [ ] No errors or visual breakage when team data is unavailable
 

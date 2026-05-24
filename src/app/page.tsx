@@ -18,10 +18,13 @@ import { POIList } from "@/features/dashboard/components/poi-list";
 import { ItemWatchlist } from "@/features/dashboard/components/item-watchlist";
 import { ThreatAssessmentCard } from "@/features/dashboard/components/threat-assessment";
 import { TeamImpactPanel } from "@/features/dashboard/components/team-impact";
+import { QuickAnalysisCard } from "@/features/dashboard/components/quick-analysis";
+import { BossEncounterCard } from "@/features/dashboard/components/boss-encounter";
+import { CombatStrategyCard } from "@/features/dashboard/components/combat-strategy";
 import { DashboardGrid } from "@/features/dashboard/components/dashboard-grid";
 import {
-  getDashboardLayout,
-  type DashboardCardKey,
+  getDashboardComposition,
+  type CardSlot,
 } from "@/features/dashboard/lib/dashboard-layout";
 
 const vibeOptions = VIBES.map((v) => ({
@@ -62,33 +65,90 @@ export default function DashboardPage() {
     </>
   );
 
-  // Build the card map only when we have a raid plan
+  // Header pill for the hero ItemWatchlist depends on active directive
+  const watchlistPill =
+    activeGoal === "prestige" ? "PRESTIGE TARGETS" : "ACTIVE QUESTS";
+
+  let composition: ReturnType<typeof getDashboardComposition> | null = null;
   let layoutNodes: { hero: ReactNode; secondary: ReactNode; sidebar: ReactNode } | null = null;
+
   if (raidPlan) {
-    const layout = getDashboardLayout(vibeModifier);
-    const cards: Record<DashboardCardKey, ReactNode> = {
-      threat: <ThreatAssessmentCard map={raidPlan.map} />,
-      map: <MapRecommendationCard map={raidPlan.map} teamImpact={teamImpact} />,
-      pois: <POIList pois={raidPlan.pois} />,
-      watchlist: <ItemWatchlist items={raidPlan.watchlist} />,
-      loadout: <LoadoutSuggestionCard loadout={raidPlan.loadout} />,
-      "team-impact":
-        teamImpact.length > 0 ? <TeamImpactPanel teamImpact={teamImpact} /> : null,
+    composition = getDashboardComposition(vibeModifier);
+
+    const renderCard = (slot: CardSlot): ReactNode => {
+      switch (slot.key) {
+        case "threat":
+          return <ThreatAssessmentCard map={raidPlan.map} format={slot.format ?? "tiles"} />;
+        case "map":
+          return (
+            <MapRecommendationCard
+              map={raidPlan.map}
+              teamImpact={teamImpact}
+              variant={slot.variant === "hero" ? "hero" : "compact"}
+            />
+          );
+        case "pois":
+          return (
+            <POIList
+              pois={raidPlan.pois}
+              variant={slot.variant === "compact" ? "compact" : "detailed"}
+              sortMode={slot.sortMode ?? "priority"}
+            />
+          );
+        case "watchlist":
+          return (
+            <ItemWatchlist
+              items={raidPlan.watchlist}
+              variant={slot.variant === "compact" ? "compact" : "hero"}
+              headerPill={slot.variant === "hero" ? watchlistPill : undefined}
+            />
+          );
+        case "loadout":
+          return (
+            <LoadoutSuggestionCard
+              loadout={raidPlan.loadout}
+              variant={
+                slot.variant === "kit-detailed"
+                  ? "kit-detailed"
+                  : slot.variant === "compact"
+                    ? "compact"
+                    : "kit-categorized"
+              }
+            />
+          );
+        case "intel": {
+          const data = raidPlan.vibeIntelData;
+          switch (data.kind) {
+            case "quick-analysis":
+              return <QuickAnalysisCard data={data} />;
+            case "boss-encounter":
+              return <BossEncounterCard data={data} />;
+            case "combat-strategy":
+              return <CombatStrategyCard data={data} />;
+          }
+          return null;
+        }
+        case "team-impact":
+          return teamImpact.length > 0 ? <TeamImpactPanel teamImpact={teamImpact} /> : null;
+      }
     };
 
-    const render = (keys: DashboardCardKey[]): ReactNode => (
+    const renderSlots = (slots: CardSlot[]): ReactNode => (
       <>
-        {keys.map((k) => {
-          const node = cards[k];
-          return node ? <div key={k}>{node}</div> : null;
+        {slots.map((slot, i) => {
+          const node = renderCard(slot);
+          return node ? <div key={`${slot.key}-${i}`}>{node}</div> : null;
         })}
       </>
     );
 
     layoutNodes = {
-      hero: render(layout.hero),
-      secondary: render(layout.secondary),
-      sidebar: render(layout.sidebar),
+      hero: renderSlots(composition.hero),
+      secondary:
+        composition.shape === "12col-with-secondary"
+          ? renderSlots(composition.secondary)
+          : null,
+      sidebar: renderSlots(composition.sidebar),
     };
   }
 
@@ -129,8 +189,9 @@ export default function DashboardPage() {
         )}
 
         {/* Raid Plan */}
-        {isConnected && raidPlan && layoutNodes && (
+        {isConnected && raidPlan && composition && layoutNodes && (
           <DashboardGrid
+            shape={composition.shape}
             hero={layoutNodes.hero}
             secondary={layoutNodes.secondary}
             sidebar={layoutNodes.sidebar}
