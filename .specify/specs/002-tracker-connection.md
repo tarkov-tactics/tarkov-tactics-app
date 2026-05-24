@@ -1,11 +1,13 @@
 # Feature Spec: TarkovTracker Connection
 
-> Status: `done`
+> Status: `in-progress` (refresh moved to Settings)
 > Priority: `P0`
 > Feature: `shared`
 
 ## Overview
 Enable the player to connect their TarkovTracker account by entering an API token. The app stores the token client-side, validates it against the TarkovTracker API, fetches the player's full progression state, and makes it available app-wide via a React context/hook. This is the data lifeline — without it, the app can only show static content.
+
+Data refresh strategy: the providers (`PlayerStateProvider`, `TeamStateProvider`) **auto-fetch on mount** — so opening the app or reloading the page always pulls fresh data from TarkovTracker (rate-limit permitting). A **manual "Refresh Now"** action lives on the Settings page for when the player wants to pull again mid-session (e.g., after completing a quest in-game). There is no global refresh button in the app shell — it kept being visually noisy and the auto-refresh on load covers the vast majority of cases.
 
 ## User Stories
 - As a Tarkov player, I want to paste my TarkovTracker API token in Settings so the app can read my progression.
@@ -33,19 +35,22 @@ Enable the player to connect their TarkovTracker account by entering an API toke
 | `TokenInput` | `features/settings/components/token-input.tsx` | Client | Masked input with paste, validate, and clear actions |
 | `ConnectionStatus` | `features/settings/components/connection-status.tsx` | Client | Shows validation result: player name, level, faction, permissions |
 | `GameModeSelector` | `features/settings/components/game-mode-selector.tsx` | Client | PVP/PVE toggle (auto-detected from token prefix) |
+| `DataSyncPanel` | `features/settings/components/data-sync-panel.tsx` | Client | Settings-page section showing **last-updated timestamp** for player + team data with a single **"Refresh Now"** button that calls `usePlayerState().refresh()` and `useTeamState().refresh()` in parallel. Hidden when disconnected. Replaces the previous global header refresh control. |
 
 ## Requirements
 ### Functional
-- [ ] Settings page has a token input field (masked by default, toggle to reveal)
-- [ ] "Validate" button sends token to `/api/tracker` BFF endpoint
-- [ ] On success: show player name, level, faction, game mode, permissions
-- [ ] On failure: show clear error message (invalid token, rate limited, network error)
-- [ ] Token is stored in `localStorage` (key: `tarkov-tracker-token`)
-- [ ] Token persists across page reloads and browser restarts
-- [ ] "Disconnect" button clears token from storage and resets app state
-- [ ] `PlayerStateProvider` context wraps the app, exposing `usePlayerState()` globally
-- [ ] Auto-fetch progress on app load if token exists in storage
-- [ ] BFF route (`/api/tracker`) proxies requests — token never leaves the client→server boundary in plain text
+- [x] Settings page has a token input field (masked by default, toggle to reveal)
+- [x] "Validate" button sends token to `/api/tracker` BFF endpoint
+- [x] On success: show player name, level, faction, game mode, permissions
+- [x] On failure: show clear error message (invalid token, rate limited, network error)
+- [x] Token is stored in `localStorage` (key: `tarkov-tracker-token`)
+- [x] Token persists across page reloads and browser restarts
+- [x] "Disconnect" button clears token from storage and resets app state (also reachable as "Log Out" from the sidebar footer per spec-001)
+- [x] `PlayerStateProvider` context wraps the app, exposing `usePlayerState()` globally
+- [x] **Auto-fetch progress on app load** if token exists in storage. This is the primary refresh mechanism — reloading the page = fresh data.
+- [x] BFF route (`/api/tracker`) proxies requests — token never leaves the client→server boundary in plain text
+- [ ] Settings page renders `DataSyncPanel` showing last-updated timestamp + "Refresh Now" button that triggers both `usePlayerState().refresh()` and `useTeamState().refresh()`. The button shows a spinner while either request is in-flight and is disabled while loading.
+- [ ] No global header refresh button — removed in favor of the per-Settings `DataSyncPanel` (see spec-001 §Functional)
 
 ### Non-Functional
 - [ ] Token input should not be auto-completed by browsers (autocomplete="off")

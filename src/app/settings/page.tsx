@@ -1,7 +1,9 @@
 "use client";
 
 import { TokenInput } from "@/features/settings/components/token-input";
+import { DataSyncPanel } from "@/features/settings/components/data-sync-panel";
 import { usePlayerState } from "@/hooks/use-player-state";
+import { PageHeader } from "@/components/layout/page-header";
 
 export default function SettingsPage() {
   const { gameMode } = usePlayerState();
@@ -9,14 +11,12 @@ export default function SettingsPage() {
   return (
     <div className="p-4 md:p-6 lg:p-8">
       <div className="mx-auto max-w-4xl space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">
-            Settings
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Configure your TarkovTracker connection and app preferences.
-          </p>
-        </div>
+        <PageHeader
+          title="Settings"
+          subtitle="Configure your TarkovTracker connection and app preferences."
+        />
+
+        <DataSyncPanel />
 
         <section className="rounded-xl border bg-card p-5 space-y-4">
           <h2 className="text-lg font-semibold">TarkovTracker API Token</h2>

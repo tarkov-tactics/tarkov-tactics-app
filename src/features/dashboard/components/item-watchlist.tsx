@@ -1,42 +1,70 @@
 "use client";
 
-import { Package } from "lucide-react";
+import {
+  Package,
+  BriefcaseMedical,
+  Cpu,
+  Key,
+  FolderOpen,
+  Wrench,
+  type LucideIcon,
+} from "lucide-react";
 import type { WatchlistItem } from "../lib/types";
 
 interface ItemWatchlistProps {
   items: WatchlistItem[];
 }
 
-export function ItemWatchlist({ items }: ItemWatchlistProps) {
-  if (items.length === 0) return null;
+function pickIcon(name: string): LucideIcon {
+  const n = name.toLowerCase();
+  if (/(salewa|medkit|medical|ifak|car kit|vaccine|ledx|cms|surv)/i.test(n))
+    return BriefcaseMedical;
+  if (/(gpu|graphics|cpu|chip|tetriz|electronic)/i.test(n)) return Cpu;
+  if (/(key|keycard)/i.test(n)) return Key;
+  if (/(folder|intelligence|document|secure flash)/i.test(n)) return FolderOpen;
+  if (/(gas analyzer|wrench|tool|drill|hammer|screw)/i.test(n)) return Wrench;
+  return Package;
+}
 
+export function ItemWatchlist({ items }: ItemWatchlistProps) {
   return (
-    <div className="rounded-xl border bg-card p-5 space-y-3">
-      <div className="flex items-center gap-3">
-        <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
-          <Package className="size-5 text-primary" />
-        </div>
-        <div>
-          <h3 className="font-semibold">Item Watchlist</h3>
-          <p className="text-xs text-muted-foreground">
-            Grab these if you find them
+    <div className="rounded-lg border border-border bg-card text-card-foreground">
+      <div className="p-5 pb-3 border-b border-border">
+        <h3 className="text-telemetry text-muted-foreground">Item Watchlist</h3>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="p-5 text-sm text-muted-foreground">
+          <p>
+            No quest items to grab this raid. Switch directives, accept new
+            tasks at traders, or check back after a refresh.
           </p>
         </div>
-      </div>
-
-      <div className="space-y-2">
-        {items.map((item) => (
-          <div
-            key={item.itemId}
-            className="flex items-center justify-between rounded-lg border bg-background px-4 py-2.5 text-sm"
-          >
-            <span className="truncate font-medium">{item.itemName}</span>
-            <span className="text-[10px] text-muted-foreground shrink-0 ml-2 max-w-[180px] truncate">
-              {item.reason}
-            </span>
-          </div>
-        ))}
-      </div>
+      ) : (
+        <div className="p-5 space-y-2.5">
+          {items.map((item) => {
+          const Icon = pickIcon(item.itemName);
+          return (
+            <div
+              key={item.itemId}
+              className="flex items-center gap-3 rounded-md border border-border bg-background px-3 py-2.5"
+            >
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-card">
+                <Icon className="size-4 text-primary" aria-hidden />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium leading-none truncate">
+                  {item.itemName}
+                </p>
+                <p className="mt-1 text-[10px] font-mono text-muted-foreground truncate uppercase tracking-wide">
+                  {item.reason}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+        </div>
+      )}
     </div>
   );
 }

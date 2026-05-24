@@ -12,13 +12,14 @@ features/<name>/
 
 ## Rules
 - Features may import from `@/lib`, `@/hooks`, `@/types`, `@/components`
-- Features must NOT import from other features (except `VibeQuickSwitch` used in Dashboard — cross-feature UI is acceptable for embedding)
-- Cross-feature **data** communication goes through shared hooks (`usePlayerState`, `useTeamState`, `useGameData`)
+- Features must NOT import from other features. The Dashboard composes selectors via the shared `LabeledSelector` primitive (`@/components/shared/labeled-selector`) reading from `useVibeConfig` and `useGoalState` — no cross-feature component imports.
+- Cross-feature **data** communication goes through shared hooks (`usePlayerState`, `useTeamState`, `useGameData`, `useGoonReports`)
 
 ## Shared Data Providers (in `src/hooks/`)
 - `usePlayerState()` — TarkovTracker player progression
 - `useTeamState()` — TarkovTracker team progression
 - `useGameData()` — tarkov.dev game tasks + maps (shared context, fetched once)
+- `useGoonReports()` — tarkov.dev community goon sightings (polled, gated on connected player)
 
 **Critical rule**: Features must NEVER fetch game data independently. Always consume `useGameData()` from the shared provider.
 

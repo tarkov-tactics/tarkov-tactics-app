@@ -7,13 +7,14 @@ export const siteConfig = {
     tarkovTracker: 'https://tarkovtracker.org',
     tarkovDev: 'https://tarkov.dev',
   },
-  nav: [
+  primaryNav: [
     { title: 'Dashboard', href: '/', icon: 'layout-dashboard' },
-    { title: 'Goals', href: '/goals', icon: 'target' },
-    { title: 'Vibes', href: '/vibes', icon: 'flame' },
+    { title: 'Directives', href: '/goals', icon: 'target' },
     { title: 'Team', href: '/team', icon: 'users' },
+  ],
+  secondaryNav: [
     { title: 'Settings', href: '/settings', icon: 'settings' },
   ],
 } as const;
 
-export type NavItem = (typeof siteConfig.nav)[number];
+export type NavItem = (typeof siteConfig.primaryNav)[number];

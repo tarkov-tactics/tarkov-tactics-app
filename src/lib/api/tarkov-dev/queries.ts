@@ -67,3 +67,12 @@ export const HIDEOUT_STATIONS_QUERY = `
     }
   }
 `;
+
+export const GOON_REPORTS_QUERY = `
+  query GoonReports($gameMode: GameMode) {
+    goonReports(gameMode: $gameMode, limit: 50) {
+      map { id name }
+      timestamp
+    }
+  }
+`;

@@ -39,11 +39,12 @@ export function GoalCard({ goal, isActive, onSelect, progress }: GoalCardProps) 
     <button
       onClick={onSelect}
       className={cn(
-        "rounded-xl border bg-card p-5 text-left transition-all duration-200 w-full",
+        "rounded-lg border bg-card p-5 text-left transition-all duration-200 w-full",
         "hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+        "active:translate-y-px",
         isActive
           ? "border-primary/50 shadow-md shadow-primary/10 ring-1 ring-primary/20"
-          : "border-border hover:border-primary/30 hover:scale-[1.01]"
+          : "border-border hover:border-primary/30"
       )}
     >
       <div className="flex items-start gap-3">

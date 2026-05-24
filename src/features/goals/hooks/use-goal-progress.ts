@@ -6,8 +6,14 @@ import { usePlayerState } from '@/hooks/use-player-state';
 import { useGameData } from '@/hooks/use-game-data';
 import type { TarkovTask } from '@/lib/api/tarkov-dev/types';
 import type { ProgressData } from '@/lib/api/tarkov-tracker/types';
+import {
+  PRESTIGE_TIERS,
+  DEFAULT_PRESTIGE_TARGET,
+  type PrestigeTarget,
+} from '../lib/prestige-tiers';
 
 const STORAGE_KEY = 'active-goal';
+const PRESTIGE_TARGET_KEY = 'prestige-target';
 
 function readGoal(): GoalId | null {
   if (typeof window === 'undefined') return null;
@@ -18,24 +24,35 @@ function readGoal(): GoalId | null {
   } catch { return null; }
 }
 
+function readPrestigeTarget(): PrestigeTarget {
+  if (typeof window === 'undefined') return DEFAULT_PRESTIGE_TARGET;
+  try {
+    const stored = localStorage.getItem(PRESTIGE_TARGET_KEY);
+    const n = stored ? Number(stored) : NaN;
+    if (n >= 1 && n <= 6) return n as PrestigeTarget;
+    return DEFAULT_PRESTIGE_TARGET;
+  } catch { return DEFAULT_PRESTIGE_TARGET; }
+}
+
 // ── Per-goal task filtering ─────────────────────────────────────
 
-function getGoalTasks(goalId: GoalId, allTasks: TarkovTask[], progress: ProgressData | null): TarkovTask[] {
+function getGoalTasks(
+  goalId: GoalId,
+  allTasks: TarkovTask[],
+  progress: ProgressData | null,
+  prestigeTarget: PrestigeTarget,
+): TarkovTask[] {
   switch (goalId) {
     case 'kappa':
-      // Kappa requires all kappaRequired tasks (or all if field unavailable)
       return allTasks.filter((t) => t.kappaRequired !== false);
 
     case 'lightkeeper':
-      // Lightkeeper chain — filter by Lightkeeper trader tasks + prerequisites
       return allTasks.filter(
         (t) => t.trader.name === 'Lightkeeper' || t.name.toLowerCase().includes('lightkeeper')
       );
 
     case 'story-endings':
-      // Story tasks — faction-specific quest chains
       if (!progress) return allTasks.filter((t) => t.name.toLowerCase().includes('story'));
-      // Filter by faction if we know it
       return allTasks.filter((t) => {
         const name = t.name.toLowerCase();
         return name.includes('story') ||
@@ -43,9 +60,16 @@ function getGoalTasks(goalId: GoalId, allTasks: TarkovTask[], progress: Progress
           (progress.pmcFaction === 'USEC' && name.includes('usec'));
       });
 
-    case 'prestige':
-      // Prestige tracks all tasks as general progression
-      return allTasks;
+    case 'prestige': {
+      // Target-tier-specific task list when defined, otherwise fall back
+      // to all kappa-required tasks (broad general-progression filter).
+      const tier = PRESTIGE_TIERS[prestigeTarget];
+      if (tier?.requiredTaskIds?.length) {
+        const ids = new Set(tier.requiredTaskIds);
+        return allTasks.filter((t) => ids.has(t.id));
+      }
+      return allTasks.filter((t) => t.kappaRequired !== false);
+    }
 
     default:
       return allTasks;
@@ -65,9 +89,10 @@ export interface GoalProgress {
 function computeGoalProgress(
   goalId: GoalId,
   allTasks: TarkovTask[],
-  progress: ProgressData | null
+  progress: ProgressData | null,
+  prestigeTarget: PrestigeTarget,
 ): GoalProgress {
-  const goalTasks = getGoalTasks(goalId, allTasks, progress);
+  const goalTasks = getGoalTasks(goalId, allTasks, progress, prestigeTarget);
   const total = goalTasks.length;
 
   if (!progress || total === 0) {
@@ -95,6 +120,7 @@ function computeGoalProgress(
 
 export function useGoalState() {
   const [activeGoal, setActiveGoalState] = useState<GoalId | null>(() => readGoal());
+  const [prestigeTarget, setPrestigeTargetState] = useState<PrestigeTarget>(() => readPrestigeTarget());
   const { progress } = usePlayerState();
   const { tasks: gameTasks, dataLoaded } = useGameData();
 
@@ -103,20 +129,23 @@ export function useGoalState() {
     try { localStorage.setItem(STORAGE_KEY, id); } catch { /* noop */ }
   }, []);
 
+  const setPrestigeTarget = useCallback((target: PrestigeTarget) => {
+    setPrestigeTargetState(target);
+    try { localStorage.setItem(PRESTIGE_TARGET_KEY, String(target)); } catch { /* noop */ }
+  }, []);
+
   const goalDefinition: GoalDefinition | null =
     activeGoal ? GOALS.find((g) => g.id === activeGoal) ?? null : null;
 
-  // Compute progress for ALL goals (used for the card grid)
   const allGoalProgress = useMemo(() => {
     if (!dataLoaded || gameTasks.length === 0) return null;
     const map = new Map<GoalId, GoalProgress>();
     for (const goal of GOALS) {
-      map.set(goal.id, computeGoalProgress(goal.id, gameTasks, progress));
+      map.set(goal.id, computeGoalProgress(goal.id, gameTasks, progress, prestigeTarget));
     }
     return map;
-  }, [gameTasks, dataLoaded, progress]);
+  }, [gameTasks, dataLoaded, progress, prestigeTarget]);
 
-  // Active goal's progress
   const activeGoalProgress = activeGoal && allGoalProgress
     ? allGoalProgress.get(activeGoal) ?? null
     : null;
@@ -128,5 +157,7 @@ export function useGoalState() {
     allGoalProgress,
     activeGoalProgress,
     gameDataLoaded: dataLoaded,
+    prestigeTarget,
+    setPrestigeTarget,
   };
 }

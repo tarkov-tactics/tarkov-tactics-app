@@ -1,62 +1,105 @@
 "use client";
 
-import { Loader2, Link2Off, RefreshCw } from "lucide-react";
+import { Loader2, Link2Off } from "lucide-react";
+import Link from "next/link";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { LabeledSelector } from "@/components/shared/labeled-selector";
+import { PageHeader } from "@/components/layout/page-header";
 import { usePlayerState } from "@/hooks/use-player-state";
-import { useGoalState } from "@/features/goals/hooks/use-goal-progress";
-import { useVibeConfig } from "@/features/vibes/hooks/use-vibe-config";
 import { useRaidPlan } from "@/features/dashboard/hooks/use-raid-plan";
-import { VibeQuickSwitch } from "@/features/vibes/components/vibe-quick-switch";
+import { useVibeConfig } from "@/features/vibes/hooks/use-vibe-config";
+import { useGoalState } from "@/features/goals/hooks/use-goal-progress";
+import { VIBES, type VibeId } from "@/features/vibes/types";
+import { GOALS, type GoalId } from "@/features/goals/types";
 import { MapRecommendationCard } from "@/features/dashboard/components/map-recommendation";
 import { LoadoutSuggestionCard } from "@/features/dashboard/components/loadout-suggestion";
 import { POIList } from "@/features/dashboard/components/poi-list";
 import { ItemWatchlist } from "@/features/dashboard/components/item-watchlist";
-import { RiskPanel } from "@/features/dashboard/components/risk-panel";
+import { ThreatAssessmentCard } from "@/features/dashboard/components/threat-assessment";
 import { TeamImpactPanel } from "@/features/dashboard/components/team-impact";
-import Link from "next/link";
+import { DashboardGrid } from "@/features/dashboard/components/dashboard-grid";
+import {
+  getDashboardLayout,
+  type DashboardCardKey,
+} from "@/features/dashboard/lib/dashboard-layout";
+
+const vibeOptions = VIBES.map((v) => ({
+  value: v.id,
+  label: v.name,
+  icon: v.icon,
+}));
+
+const goalOptions = GOALS.map((g) => ({
+  value: g.id,
+  label: g.name,
+  icon: g.icon,
+}));
 
 export default function DashboardPage() {
-  const { isConnected, refresh: refreshPlayer, isLoading: playerLoading } = usePlayerState();
-  const { goalDefinition } = useGoalState();
-  const { vibeDefinition } = useVibeConfig();
+  const { isConnected, isLoading: playerLoading } = usePlayerState();
   const { raidPlan, teamImpact, isLoading: dataLoading } = useRaidPlan();
+  const { activeVibe, setActiveVibe, vibeModifier } = useVibeConfig();
+  const { activeGoal, setActiveGoal } = useGoalState();
 
   const isLoading = playerLoading || dataLoading;
 
+  const headerActions = (
+    <>
+      <LabeledSelector<VibeId>
+        label="Select Vibe"
+        value={activeVibe}
+        onChange={setActiveVibe}
+        options={vibeOptions}
+      />
+      <LabeledSelector<GoalId>
+        label="Active Directive"
+        value={activeGoal}
+        onChange={setActiveGoal}
+        options={goalOptions}
+        placeholder="Select…"
+      />
+    </>
+  );
+
+  // Build the card map only when we have a raid plan
+  let layoutNodes: { hero: ReactNode; secondary: ReactNode; sidebar: ReactNode } | null = null;
+  if (raidPlan) {
+    const layout = getDashboardLayout(vibeModifier);
+    const cards: Record<DashboardCardKey, ReactNode> = {
+      threat: <ThreatAssessmentCard map={raidPlan.map} />,
+      map: <MapRecommendationCard map={raidPlan.map} teamImpact={teamImpact} />,
+      pois: <POIList pois={raidPlan.pois} />,
+      watchlist: <ItemWatchlist items={raidPlan.watchlist} />,
+      loadout: <LoadoutSuggestionCard loadout={raidPlan.loadout} />,
+      "team-impact":
+        teamImpact.length > 0 ? <TeamImpactPanel teamImpact={teamImpact} /> : null,
+    };
+
+    const render = (keys: DashboardCardKey[]): ReactNode => (
+      <>
+        {keys.map((k) => {
+          const node = cards[k];
+          return node ? <div key={k}>{node}</div> : null;
+        })}
+      </>
+    );
+
+    layoutNodes = {
+      hero: render(layout.hero),
+      secondary: render(layout.secondary),
+      sidebar: render(layout.sidebar),
+    };
+  }
+
   return (
     <div className="p-4 md:p-6 lg:p-8">
-      <div className="mx-auto max-w-4xl space-y-6">
-        {/* Dashboard Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">
-              Next Raid
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {goalDefinition
-                ? `${goalDefinition.icon} ${goalDefinition.name}`
-                : "No goal selected"}{" "}
-              · {vibeDefinition.icon} {vibeDefinition.name}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <VibeQuickSwitch />
-            {isConnected && (
-              <Button
-                variant="outline"
-                size="icon-sm"
-                onClick={refreshPlayer}
-                disabled={isLoading}
-                aria-label="Refresh data"
-              >
-                <RefreshCw
-                  className={`size-3.5 ${isLoading ? "animate-spin" : ""}`}
-                />
-              </Button>
-            )}
-          </div>
-        </div>
+      <div className="mx-auto max-w-6xl space-y-6">
+        <PageHeader
+          title="Intel Briefing"
+          subtitle="Next Raid Parameters Confirmed."
+          actions={headerActions}
+        />
 
         {/* Not connected state */}
         {!isConnected && (
@@ -69,10 +112,7 @@ export default function DashboardPage() {
                 personalized raid recommendations based on your quest progress.
               </p>
             </div>
-            <Button
-              nativeButton={false}
-              render={<Link href="/settings" />}
-            >
+            <Button nativeButton={false} render={<Link href="/settings" />}>
               Go to Settings
             </Button>
           </div>
@@ -89,28 +129,15 @@ export default function DashboardPage() {
         )}
 
         {/* Raid Plan */}
-        {isConnected && raidPlan && (
-          <div className="space-y-4">
-            <MapRecommendationCard
-              map={raidPlan.map}
-              teamImpact={teamImpact}
-            />
-
-            <div className="grid gap-4 lg:grid-cols-2">
-              <LoadoutSuggestionCard loadout={raidPlan.loadout} />
-              <RiskPanel risks={raidPlan.risks} />
-            </div>
-
-            <POIList pois={raidPlan.pois} />
-            <ItemWatchlist items={raidPlan.watchlist} />
-
-            {teamImpact.length > 0 && (
-              <TeamImpactPanel teamImpact={teamImpact} />
-            )}
-          </div>
+        {isConnected && raidPlan && layoutNodes && (
+          <DashboardGrid
+            hero={layoutNodes.hero}
+            secondary={layoutNodes.secondary}
+            sidebar={layoutNodes.sidebar}
+          />
         )}
 
-        {/* Connected but no plan (no game data or all tasks complete) */}
+        {/* Connected but no plan */}
         {isConnected && !isLoading && !raidPlan && (
           <div className="rounded-xl border bg-card p-8 text-center space-y-3">
             <span className="text-4xl">🎉</span>

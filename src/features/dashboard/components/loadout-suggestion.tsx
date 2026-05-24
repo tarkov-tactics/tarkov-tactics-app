@@ -1,48 +1,63 @@
 "use client";
 
-import { Shield } from "lucide-react";
 import type { LoadoutSuggestion } from "../lib/types";
 
 interface LoadoutSuggestionCardProps {
   loadout: LoadoutSuggestion;
 }
 
+interface LoadoutRow {
+  label: string;
+  value: string;
+  emphasis?: "primary" | "destructive" | "muted";
+}
+
+const emphasisStyles: Record<NonNullable<LoadoutRow["emphasis"]>, string> = {
+  primary: "text-primary",
+  destructive: "text-destructive",
+  muted: "text-muted-foreground",
+};
+
 export function LoadoutSuggestionCard({ loadout }: LoadoutSuggestionCardProps) {
-  const formatted = new Intl.NumberFormat("en-US").format(loadout.estimatedBudget);
+  const budget = new Intl.NumberFormat("en-US").format(loadout.estimatedBudget);
+
+  const rows: LoadoutRow[] = [
+    { label: "Primary WPN", value: loadout.weapon, emphasis: "primary" },
+    { label: "Armor", value: loadout.armor },
+    { label: "Rig", value: loadout.rig },
+  ];
 
   return (
-    <div className="rounded-xl border bg-card p-5 space-y-3">
-      <div className="flex items-center gap-3">
-        <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
-          <Shield className="size-5 text-primary" />
-        </div>
-        <div>
-          <h3 className="font-semibold">Loadout Suggestion</h3>
-          <p className="text-xs text-muted-foreground">
-            Estimated budget: ₽{formatted}
-          </p>
-        </div>
+    <div className="rounded-lg border border-border bg-card text-card-foreground">
+      <div className="p-5 pb-3 flex items-center justify-between gap-3 border-b border-border">
+        <h3 className="text-telemetry text-muted-foreground">Kit Proposal</h3>
+        <span className="text-[10px] font-mono text-muted-foreground tracking-wider">
+          ₽{budget}
+        </span>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-lg bg-muted/50 p-3 text-center space-y-1">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
-            Weapon
-          </p>
-          <p className="text-xs font-medium">{loadout.weapon}</p>
-        </div>
-        <div className="rounded-lg bg-muted/50 p-3 text-center space-y-1">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
-            Armor
-          </p>
-          <p className="text-xs font-medium">{loadout.armor}</p>
-        </div>
-        <div className="rounded-lg bg-muted/50 p-3 text-center space-y-1">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
-            Rig
-          </p>
-          <p className="text-xs font-medium">{loadout.rig}</p>
-        </div>
+      <div className="p-5 space-y-3">
+        {rows.map((row, i) => (
+          <div key={row.label}>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-telemetry text-muted-foreground">
+                {row.label}
+              </span>
+              <span
+                className={`text-xs font-semibold font-mono ${
+                  row.emphasis
+                    ? emphasisStyles[row.emphasis]
+                    : "text-foreground"
+                }`}
+              >
+                {row.value}
+              </span>
+            </div>
+            {i < rows.length - 1 && (
+              <div className="h-px bg-border/60 mt-3" />
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );

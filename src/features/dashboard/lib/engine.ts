@@ -238,11 +238,13 @@ export function computeRaidPlan(
     teamOverlap: 0,
   };
 
+  const bestMapData = maps.find((m) => m.name === bestMap.mapName);
   const mapRec: MapRecommendation = {
-    mapId: bestMap.mapName.toLowerCase().replace(/\s+/g, '-'),
+    mapId: bestMapData?.id ?? bestMap.mapName.toLowerCase().replace(/\s+/g, '-'),
     mapName: bestMap.mapName,
     reasoning: buildReasoning(bestMap, vibeModifier),
     questObjectiveCount: bestMap.questCount,
+    raidDurationMin: bestMapData?.raidDuration ?? null,
   };
 
   const loadout = computeLoadout(progress.playerLevel, vibeModifier);

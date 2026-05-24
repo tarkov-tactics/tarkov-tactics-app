@@ -11,6 +11,8 @@ export interface MapRecommendation {
   mapName: string;
   reasoning: string;
   questObjectiveCount: number;
+  /** Raid duration in minutes (from tarkov.dev). null if unknown. */
+  raidDurationMin?: number | null;
 }
 
 export interface LoadoutSuggestion {

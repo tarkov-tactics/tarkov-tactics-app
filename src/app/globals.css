@@ -39,6 +39,10 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-emerald: var(--emerald);
+  --color-emerald-foreground: var(--emerald-foreground);
+  --color-amber: var(--amber);
+  --color-amber-foreground: var(--amber-foreground);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -56,67 +60,83 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.45 0.2 285);
+  --primary: oklch(0.55 0.18 300);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0.005 285);
+  --secondary: oklch(0.97 0.005 300);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.95 0.01 285);
+  --accent: oklch(0.95 0.01 300);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
+  --emerald: oklch(0.55 0.18 155);
+  --emerald-foreground: oklch(0.985 0 0);
+  --amber: oklch(0.68 0.18 75);
+  --amber-foreground: oklch(0.205 0 0);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.55 0.18 285);
-  --chart-1: oklch(0.55 0.2 285);
-  --chart-2: oklch(0.65 0.15 285);
+  --ring: oklch(0.55 0.18 300);
+  --chart-1: oklch(0.55 0.2 300);
+  --chart-2: oklch(0.65 0.15 300);
   --chart-3: oklch(0.45 0.18 160);
   --chart-4: oklch(0.7 0.12 45);
   --chart-5: oklch(0.5 0.2 350);
   --radius: 0.625rem;
-  --sidebar: oklch(0.97 0.005 285);
+  --sidebar: oklch(0.97 0.005 300);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.45 0.2 285);
+  --sidebar-primary: oklch(0.55 0.18 300);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.95 0.01 285);
+  --sidebar-accent: oklch(0.95 0.01 300);
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.55 0.18 285);
+  --sidebar-ring: oklch(0.55 0.18 300);
 }
 
-/* ── Dark mode — military tactical + purple accents ─────────────── */
+/* ── Dark mode — Tarkov Tactical Interface (TTI) ───────────────────
+   Surface tiers based on Stitch DESIGN.md tokens:
+     background  ≈ #141318 (Blackout Slate)
+     card        ≈ #201f24 (Ballistic Carbon)
+     muted       ≈ #2b292f
+     border      ≈ #4b4453
+   Primary (Tactical Violet) ≈ #d9b9ff — light lilac for accents, focus,
+   progress fills. Pairs with dark foreground for solid button fills.
+*/
 .dark {
-  --background: oklch(0.13 0.01 285);
-  --foreground: oklch(0.93 0.01 285);
-  --card: oklch(0.18 0.015 285);
-  --card-foreground: oklch(0.93 0.01 285);
-  --popover: oklch(0.18 0.015 285);
-  --popover-foreground: oklch(0.93 0.01 285);
-  --primary: oklch(0.65 0.2 285);
-  --primary-foreground: oklch(0.13 0.01 285);
-  --secondary: oklch(0.22 0.02 285);
-  --secondary-foreground: oklch(0.93 0.01 285);
-  --muted: oklch(0.22 0.02 285);
-  --muted-foreground: oklch(0.6 0.03 285);
-  --accent: oklch(0.25 0.03 285);
-  --accent-foreground: oklch(0.93 0.01 285);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(0.28 0.025 285);
-  --input: oklch(0.25 0.02 285);
-  --ring: oklch(0.65 0.2 285);
-  --chart-1: oklch(0.65 0.2 285);
-  --chart-2: oklch(0.55 0.15 285);
-  --chart-3: oklch(0.6 0.18 160);
-  --chart-4: oklch(0.7 0.12 45);
-  --chart-5: oklch(0.55 0.2 350);
-  --sidebar: oklch(0.16 0.015 285);
-  --sidebar-foreground: oklch(0.93 0.01 285);
-  --sidebar-primary: oklch(0.65 0.2 285);
-  --sidebar-primary-foreground: oklch(0.13 0.01 285);
-  --sidebar-accent: oklch(0.22 0.02 285);
-  --sidebar-accent-foreground: oklch(0.93 0.01 285);
-  --sidebar-border: oklch(0.28 0.025 285);
-  --sidebar-ring: oklch(0.65 0.2 285);
+  --background: oklch(0.13 0.005 300);
+  --foreground: oklch(0.91 0.012 300);
+  --card: oklch(0.19 0.012 300);
+  --card-foreground: oklch(0.91 0.012 300);
+  --popover: oklch(0.19 0.012 300);
+  --popover-foreground: oklch(0.91 0.012 300);
+  --primary: oklch(0.82 0.10 305);
+  --primary-foreground: oklch(0.18 0.04 305);
+  --secondary: oklch(0.22 0.015 300);
+  --secondary-foreground: oklch(0.91 0.012 300);
+  --muted: oklch(0.23 0.015 300);
+  --muted-foreground: oklch(0.66 0.025 300);
+  --accent: oklch(0.27 0.02 300);
+  --accent-foreground: oklch(0.91 0.012 300);
+  --destructive: oklch(0.78 0.14 22);
+  --emerald: oklch(0.72 0.16 155);
+  --emerald-foreground: oklch(0.18 0.04 155);
+  --amber: oklch(0.80 0.15 75);
+  --amber-foreground: oklch(0.18 0.05 75);
+  --border: oklch(0.31 0.022 300);
+  --input: oklch(0.31 0.022 300);
+  --ring: oklch(0.82 0.10 305);
+  --chart-1: oklch(0.82 0.10 305);
+  --chart-2: oklch(0.62 0.16 300);
+  --chart-3: oklch(0.72 0.16 155);
+  --chart-4: oklch(0.80 0.15 75);
+  --chart-5: oklch(0.78 0.14 22);
+  --sidebar: oklch(0.17 0.012 300);
+  --sidebar-foreground: oklch(0.91 0.012 300);
+  --sidebar-primary: oklch(0.82 0.10 305);
+  --sidebar-primary-foreground: oklch(0.18 0.04 305);
+  --sidebar-accent: oklch(0.23 0.015 300);
+  --sidebar-accent-foreground: oklch(0.91 0.012 300);
+  --sidebar-border: oklch(0.31 0.022 300);
+  --sidebar-ring: oklch(0.82 0.10 305);
 }
 
 @layer base {
@@ -129,4 +149,15 @@
   html {
     @apply font-sans;
   }
+}
+
+/* TTI telemetry label — small uppercase mono used for panel labels,
+   metric headers, and selector captions. See constitution §Design System. */
+@utility text-telemetry {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  line-height: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }

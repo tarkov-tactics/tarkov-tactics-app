@@ -1,11 +1,11 @@
 # Feature Spec: Game Data Service
 
-> Status: `done`
+> Status: `in-progress` (goon reports addition)
 > Priority: `P0`
 > Feature: `shared`
 
 ## Overview
-Fetch and cache game reference data from the tarkov.dev GraphQL API. This includes tasks (quests), maps, items, and hideout stations. This data is static within a wipe cycle and changes infrequently. Other features (Goals, Vibes, Dashboard) consume this data to compute recommendations. The service operates at two levels: server-side functions for SSR/build-time use, and a client-side `GameDataProvider` context for shared access across all client components.
+Fetch and cache game reference data from the tarkov.dev GraphQL API. This includes tasks (quests), maps, items, hideout stations, and **community-reported Goon Squad sightings**. Static reference data is fetched once on mount; the Goon Reports feed is live community telemetry that **polls on a short interval**. Other features (Goals, Vibes, Dashboard) consume this data to compute recommendations. The service operates at two levels: server-side functions for SSR/build-time use, and a client-side `GameDataProvider` context for shared access across all client components.
 
 ## User Stories
 - As a Tarkov player, I want the app to know all available quests and their requirements so it can tell me what to do next.
@@ -21,10 +21,13 @@ Fetch and cache game reference data from the tarkov.dev GraphQL API. This includ
 - `maps` — map ID, name, bosses (name, spawn chance), raid duration, enemies
 - `items` — item ID, name, icon, 24h price, sell-for prices
 - `hideoutStations` — station ID, name, levels with item requirements
+- `goonReports(gameMode)` — community-submitted Goon Squad sightings; returns `{ map { id name }, timestamp }[]`. Filterable by `pvp` / `pve` to match the player's connected game mode.
 
 ### Computed/Derived
 - `tasksByMap` — tasks grouped by their primary map and objective maps
 - `bossSpawnsByMap` — boss spawn chances keyed by map name
+- `latestGoonSighting` — the single most recent goon report across all maps (used as the "Goons sighted" hero indicator)
+- `goonSightingByMap(mapId)` — most recent report for a given map, with relative-time formatting (e.g., "2m ago")
 
 ## Architecture
 
@@ -41,9 +44,10 @@ Fetch and cache game reference data from the tarkov.dev GraphQL API. This includ
 ### Client-Side (shared context)
 | Component | Location | Description |
 |-----------|----------|-------------|
-| `GameDataProvider` | `hooks/use-game-data.tsx` | React context provider, fetches tarkov.dev data once on mount via `/api/tarkov` BFF, exposes `useGameData()` |
+| `GameDataProvider` | `hooks/use-game-data.tsx` | React context provider, fetches static tarkov.dev data once on mount via `/api/tarkov` BFF, exposes `useGameData()` |
+| `GoonReportsProvider` | `hooks/use-goon-reports.tsx` | Lightweight provider nested inside `GameDataProvider`. Polls `/api/tarkov` for `goonReports` on a configurable interval (default **3 minutes**, paused when tab is hidden via `visibilitychange`). Exposes `useGoonReports()` returning `{ reports, latest, byMap(mapId), lastFetched, isStale }`. |
 
-The `GameDataProvider` lives in `AppShell` (after `TeamStateProvider`) and ensures all pages share a single fetch of game data. Every feature that needs game tasks/maps consumes `useGameData()` — no duplicate fetches.
+The `GameDataProvider` lives in `AppShell` (after `TeamStateProvider`) and ensures all pages share a single fetch of static game data. Goon reports are separated into their own provider so the polling lifecycle doesn't trigger re-renders of the entire static data tree. Every feature that needs game tasks/maps consumes `useGameData()`; sighting consumers use `useGoonReports()` — no duplicate fetches.
 
 ### BFF Route
 | Route | Location | Description |
@@ -60,12 +64,19 @@ The `GameDataProvider` lives in `AppShell` (after `TeamStateProvider`) and ensur
 - [x] GraphQL queries include `kappaRequired` and `taskRequirements` fields on tasks
 - [x] Error handling: sets `error` state, returns empty arrays on failure
 - [x] All data typed against `src/lib/api/tarkov-dev/types.ts`
+- [ ] Add `GOON_REPORTS_QUERY` to `lib/api/tarkov-dev/queries.ts` — `query GoonReports($gameMode: GameMode) { goonReports(gameMode: $gameMode) { map { id name } timestamp } }`
+- [ ] Add `getGoonReports(gameMode)` to `lib/api/tarkov-dev/game-data.ts`
+- [ ] `GoonReportsProvider` polls every 3 min (config constant `GOON_POLL_INTERVAL_MS`), passes the player's `gameMode` (from `usePlayerState`) as the query variable
+- [ ] Polling pauses when `document.visibilityState === 'hidden'`, resumes on visibility
+- [ ] `useGoonReports()` returns helpers: `latest` (most recent across all maps), `byMap(mapId)` (most recent for that map or `null`), `isStale` (true if `lastFetched > 10 min ago` due to errors)
+- [ ] Time formatting helper `formatRelativeTime(date)` exported from `lib/utils.ts` — returns "Xs/m/h ago"
 
 ### Non-Functional
 - [x] Single fetch on mount — no refetching on navigation between pages
 - [x] Uses `requestAnimationFrame` wrapper for initial fetch (React 19 compliance)
 - [x] Cleanup via `AbortController` on unmount
 - [x] `refresh()` function for manual re-fetch
+- [ ] Goon reports poll respects tarkov.dev fair-use (3 min default is conservative; never more than once per 60s even on manual refresh)
 
 ## Success Criteria
 - [x] `useGameData()` returns typed task + map data on every page
@@ -78,9 +89,14 @@ The `GameDataProvider` lives in `AppShell` (after `TeamStateProvider`) and ensur
 - tarkov.dev returns partial data → handle nullable fields in types
 - Component unmounts during fetch → `AbortController` cancels, no state updates
 - GraphQL query errors → error message surfaced via `error` state
+- **Goon reports** — `goonReports` field unavailable on tarkov.dev (schema change / outage): `useGoonReports()` returns `{ reports: [], latest: null, isStale: true }` and consuming components hide the sighting indicator (no error toast — it's optional intel)
+- **Goon reports** — no `gameMode` available yet (player not connected): provider stays idle until `gameMode` is set; defaults to `pvp` if player explicitly disconnects mid-session
+- **Goon reports** — extremely old report (last sighting >24h ago): UI still renders the badge but with `stale` styling (muted color) since the threat profile is materially different
 
 ## Dependencies
-- None — this is independent of TarkovTracker connection
+- None for static data — independent of TarkovTracker connection
+- Goon reports provider **reads** `gameMode` from `usePlayerState()` (spec-002) but degrades gracefully if disconnected
 
 ## Open Questions
 - ✅ Resolved: Use raw fetch (not a GraphQL client library) — queries are static and few
+- ❓ Should goon reports also poll while disconnected (default `pvp` mode)? Recommend: **no** — gating on connection avoids confusing PVE players with PVP sightings.

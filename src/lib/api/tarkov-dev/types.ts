@@ -53,3 +53,12 @@ export interface HideoutStation {
     }>;
   }>;
 }
+
+export interface GoonReport {
+  map: { id: string; name: string };
+  /** ISO 8601 string or unix-seconds string — tarkov.dev returns a String scalar. */
+  timestamp: string;
+}
+
+/** tarkov.dev `GameMode` enum values. Maps from our internal pvp/pve. */
+export type TarkovDevGameMode = 'regular' | 'pve';

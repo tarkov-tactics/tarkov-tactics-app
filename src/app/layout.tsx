@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { Red_Hat_Text } from "next/font/google";
+import { Hanken_Grotesk } from "next/font/google";
 import { Geist_Mono } from "next/font/google";
 import { AppShell } from "@/components/layout/app-shell";
 import "./globals.css";
 
-const redHatText = Red_Hat_Text({
+const hankenGrotesk = Hanken_Grotesk({
   variable: "--font-sans",
   subsets: ["latin"],
 });
@@ -28,7 +28,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${redHatText.variable} ${geistMono.variable} dark h-full antialiased`}
+      className={`${hankenGrotesk.variable} ${geistMono.variable} dark h-full antialiased`}
     >
       <body className="h-full bg-background text-foreground">
         <AppShell>{children}</AppShell>

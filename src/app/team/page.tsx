@@ -6,6 +6,7 @@ import { usePlayerState } from "@/hooks/use-player-state";
 import { useTeamState, getSharedOpenTasks } from "@/hooks/use-team-state";
 import { TeammateCard } from "@/features/team/components/teammate-card";
 import { TeamPermissionPrompt } from "@/features/team/components/team-permission-prompt";
+import { PageHeader } from "@/components/layout/page-header";
 
 export default function TeamPage() {
   const { isConnected, progress } = usePlayerState();
@@ -38,29 +39,25 @@ export default function TeamPage() {
   return (
     <div className="p-4 md:p-6 lg:p-8">
       <div className="mx-auto max-w-4xl space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">
-              Team
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              View your squad&apos;s progression and find shared objectives.
-            </p>
-          </div>
-          {teammates.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={refresh}
-              disabled={isLoading}
-            >
-              <RefreshCw
-                className={`size-3.5 mr-1.5 ${isLoading ? "animate-spin" : ""}`}
-              />
-              Refresh
-            </Button>
-          )}
-        </div>
+        <PageHeader
+          title="Team"
+          subtitle="View your squad's progression and find shared objectives."
+          actions={
+            teammates.length > 0 ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={refresh}
+                disabled={isLoading}
+              >
+                <RefreshCw
+                  className={`size-3.5 mr-1.5 ${isLoading ? "animate-spin" : ""}`}
+                />
+                Refresh
+              </Button>
+            ) : undefined
+          }
+        />
 
         {!isConnected ? (
           <div className="rounded-xl border border-dashed border-muted-foreground/30 bg-card p-6 text-center space-y-2">
