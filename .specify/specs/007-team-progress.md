@@ -43,28 +43,28 @@ Fetch, cache, and expose the TarkovTracker team progression data as a **first-cl
 
 ## Requirements
 ### Functional
-- [ ] Team page accessible from sidebar navigation (icon: Users)
-- [ ] `TeamStateProvider` context wraps the app, exposing `useTeamState()` globally
-- [ ] Team data is fetched alongside player data when token has `TP` permission
-- [ ] BFF route `/api/tracker/team` proxies `GET /team/progress`
-- [ ] Team page shows teammate cards in a responsive grid
-- [ ] Each teammate card: display name, level, faction, task completion %, shared task count with player
-- [ ] "Shared Tasks" section: tasks that the player AND 1+ teammates both need
+- [x] Team page accessible from sidebar navigation (icon: Users)
+- [x] `TeamStateProvider` context wraps the app, exposing `useTeamState()` globally
+- [x] Team data is fetched alongside player data when token has `TP` permission
+- [x] BFF route `/api/tracker/team` proxies `GET /team/progress`
+- [x] Team page shows teammate cards in a responsive grid
+- [x] Each teammate card: display name, level (badge), faction, edition, task completion %, shared task count with player
+- [x] "Shared Tasks" section: tasks that the player AND 1+ teammates both need (displayed as flat list with teammate counts). Task names must be resolved to human-readable names by cross-referencing task IDs against the game data task list from `useGameData()` — never display raw task IDs to the user.
 - [ ] Shared tasks grouped by map for easy raid planning
 - [ ] Each shared task shows which teammates need it (avatar/initial bubbles)
-- [ ] If token lacks `TP` permission → show upgrade prompt with link to TarkovTracker
-- [ ] If no teammates → show "No teammates found" empty state
+- [x] If token lacks `TP` permission → show upgrade prompt with link to TarkovTracker
+- [x] If no teammates → show "No teammates found" empty state
 - [ ] Hidden teammates (from `meta.hiddenTeammates`) shown as "Hidden" count
-- [ ] Computed helpers are exported for other specs to consume:
+- [x] Computed helpers are exported for other specs to consume:
   - `getSharedOpenTasks(playerProgress, teamProgress[], gameTasks[])` 
   - `getTeamTaskOverlap(mapId, playerProgress, teamProgress[], gameTasks[])`
-  - `getTeammatesByMap(mapId, teamProgress[], gameTasks[])`
+  - ~~`getTeammatesByMap(mapId, teamProgress[], gameTasks[])`~~ — deferred until ranking system needs it
 
 ### Non-Functional
-- [ ] Team data cached for 5 minutes (reduce API load)
-- [ ] Stale team data shown with freshness indicator
-- [ ] Team features never block or error when TP permission is missing
-- [ ] Team computation should be fast (<100ms for 5 teammates)
+- [ ] Team data cached for 5 minutes (reduce API load) — deferred to spec-008
+- [ ] Stale team data shown with freshness indicator — deferred to spec-008
+- [x] Team features never block or error when TP permission is missing
+- [x] Team computation should be fast (<100ms for 5 teammates)
 
 ## Success Criteria
 - [ ] Connected player with TP permission sees all visible teammates
@@ -80,6 +80,7 @@ Fetch, cache, and expose the TarkovTracker team progression data as a **first-cl
 - API rate limited → show cached team data with staleness indicator
 - Teammate has different game mode (PVP vs PVE) → show warning badge on their card
 - Very large team (10+ members) → paginate or scroll, limit shared task computation
+- Shared task ID not found in game data (tarkov.dev task list outdated or ID mismatch) → display the raw task ID as fallback, do not hide the task
 
 ## Dependencies
 - Depends on: `spec-001` (App Shell — Team page renders inside the shell)

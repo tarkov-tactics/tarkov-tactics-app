@@ -9,6 +9,8 @@ interface HardRequirementsListProps {
   completedTasks: TarkovTask[];
   progress: ProgressData | null;
   limit?: number;
+  sectionLabel?: string;
+  showXpReward?: boolean;
 }
 
 interface TaskRow {
@@ -62,6 +64,8 @@ export function HardRequirementsList({
   completedTasks,
   progress,
   limit = 5,
+  sectionLabel = "Hard Requirements",
+  showXpReward = false,
 }: HardRequirementsListProps) {
   const rows = buildRows(openTasks, completedTasks, progress, limit);
 
@@ -70,7 +74,7 @@ export function HardRequirementsList({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <h4 className="text-telemetry text-muted-foreground">Hard Requirements</h4>
+        <h4 className="text-telemetry text-muted-foreground">{sectionLabel}</h4>
         {openTasks.length > limit && (
           <span className="text-telemetry text-muted-foreground/70">
             +{openTasks.length - limit} more
@@ -103,7 +107,18 @@ export function HardRequirementsList({
                       aria-hidden
                     />
                   )}
-                  <span className="text-sm font-medium truncate">{task.name}</span>
+                  {task.wikiLink ? (
+                    <a
+                      href={task.wikiLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm font-medium truncate hover:underline hover:text-primary transition-colors"
+                    >
+                      {task.name}
+                    </a>
+                  ) : (
+                    <span className="text-sm font-medium truncate">{task.name}</span>
+                  )}
                 </div>
                 <span
                   className={`text-[10px] font-mono shrink-0 tracking-wider ${
@@ -112,11 +127,13 @@ export function HardRequirementsList({
                 >
                   {complete
                     ? "COMPLETED"
-                    : countProgress
-                      ? `${countProgress.current}/${countProgress.target}`
-                      : `${task.trader.name.toUpperCase()}${
-                          task.minPlayerLevel > 1 ? ` · LVL ${task.minPlayerLevel}` : ""
-                        }`}
+                    : showXpReward
+                      ? `${(task.experience ?? 0).toLocaleString()} XP`
+                      : countProgress
+                        ? `${countProgress.current}/${countProgress.target}`
+                        : `${task.trader.name.toUpperCase()}${
+                            task.minPlayerLevel > 1 ? ` · LVL ${task.minPlayerLevel}` : ""
+                          }`}
                 </span>
               </div>
 

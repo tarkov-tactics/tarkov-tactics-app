@@ -1,10 +1,10 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { GOALS, type GoalId, type GoalDefinition } from '../types';
 import { usePlayerState } from '@/hooks/use-player-state';
 import { useGameData } from '@/hooks/use-game-data';
-import type { TarkovTask } from '@/lib/api/tarkov-dev/types';
+import type { TarkovTask, HideoutStation } from '@/lib/api/tarkov-dev/types';
 import type { ProgressData } from '@/lib/api/tarkov-tracker/types';
 import {
   PRESTIGE_TIERS,
@@ -52,6 +52,34 @@ function readScope(goalId: GoalId): ScopeId {
   } catch { return ALL_SCOPE.id; }
 }
 
+// ── Prerequisite chain resolution ───────────────────────────────
+
+function resolvePrerequisiteChain(
+  gatingQuestName: string,
+  allTasks: TarkovTask[],
+): TarkovTask[] {
+  const taskById = new Map(allTasks.map((t) => [t.id, t]));
+  const gatingTask = allTasks.find(
+    (t) => t.name === gatingQuestName && !t.taskRequirements?.some(
+      (r) => allTasks.find((at) => at.id === r.task.id)?.name === gatingQuestName
+    )
+  );
+  if (!gatingTask) return [];
+
+  const collected = new Map<string, TarkovTask>();
+  const queue = [gatingTask];
+  while (queue.length > 0) {
+    const current = queue.pop()!;
+    if (collected.has(current.id)) continue;
+    collected.set(current.id, current);
+    for (const req of current.taskRequirements ?? []) {
+      const prereq = taskById.get(req.task.id);
+      if (prereq && !collected.has(prereq.id)) queue.push(prereq);
+    }
+  }
+  return Array.from(collected.values());
+}
+
 // ── Per-goal task filtering ─────────────────────────────────────
 
 function getGoalTasks(
@@ -79,14 +107,18 @@ function getGoalTasks(
       });
 
     case 'prestige': {
-      // Target-tier-specific task list when defined, otherwise fall back
-      // to all kappa-required tasks (broad general-progression filter).
       const tier = PRESTIGE_TIERS[prestigeTarget];
-      if (tier?.requiredTaskIds?.length) {
-        const ids = new Set(tier.requiredTaskIds);
-        return allTasks.filter((t) => ids.has(t.id));
-      }
-      return allTasks.filter((t) => t.kappaRequired !== false);
+      if (!tier) return allTasks.filter((t) => t.kappaRequired !== false);
+
+      const prereqChain = resolvePrerequisiteChain(tier.gatingQuestName, allTasks);
+      if (prereqChain.length > 0) return prereqChain;
+
+      // Fallback: gating quest not found in game data
+      const levelCap = tier.minPlayerLevel;
+      return allTasks.filter((t) => {
+        if (t.kappaRequired === false) return false;
+        return (t.minPlayerLevel ?? 0) <= levelCap;
+      });
     }
 
     default:
@@ -96,12 +128,99 @@ function getGoalTasks(
 
 // ── Goal progress computation ───────────────────────────────────
 
+export interface PrestigeAxis {
+  key: string;
+  label: string;
+  current: number | null;
+  target: number;
+  met: boolean;
+}
+
 export interface GoalProgress {
   total: number;
   completed: number;
   percentage: number;
   openTasks: TarkovTask[];
   completedTasks: TarkovTask[];
+  prestigeAxes?: PrestigeAxis[];
+  xpRecommendedTasks?: TarkovTask[];
+}
+
+function computePrestigeAxes(
+  prestigeTarget: PrestigeTarget,
+  progress: ProgressData | null,
+  questProgress: GoalProgress,
+  hideoutStations: HideoutStation[],
+): PrestigeAxis[] {
+  const tier = PRESTIGE_TIERS[prestigeTarget];
+  if (!tier) return [];
+
+  const axes: PrestigeAxis[] = [];
+
+  // Level axis
+  const playerLevel = progress?.playerLevel ?? 0;
+  axes.push({
+    key: 'level',
+    label: `PMC Level ${tier.minPlayerLevel}`,
+    current: progress ? playerLevel : null,
+    target: tier.minPlayerLevel,
+    met: playerLevel >= tier.minPlayerLevel,
+  });
+
+  // Quest chain axis
+  axes.push({
+    key: 'quests',
+    label: tier.gatingQuestName,
+    current: questProgress.completed,
+    target: questProgress.total,
+    met: questProgress.openTasks.length === 0 && questProgress.total > 0,
+  });
+
+  // Hideout module axes
+  const completedModuleIds = new Set(
+    progress?.hideoutModulesProgress.filter((m) => m.complete).map((m) => m.id) ?? []
+  );
+  for (const req of tier.hideoutRequirements) {
+    const station = hideoutStations.find((s) => s.name === req.stationName);
+    let currentLevel = 0;
+    if (station) {
+      for (const lvl of station.levels) {
+        const moduleId = `${station.id}-${lvl.level}`;
+        if (completedModuleIds.has(moduleId) || completedModuleIds.has(station.id)) {
+          currentLevel = Math.max(currentLevel, lvl.level);
+        }
+      }
+    }
+    axes.push({
+      key: `hideout-${req.stationName}`,
+      label: `${req.stationName} Lv${req.level}`,
+      current: progress ? currentLevel : null,
+      target: req.level,
+      met: currentLevel >= req.level,
+    });
+  }
+
+  // Skill axes (TarkovTracker doesn't expose skill levels)
+  for (const req of tier.skillRequirements) {
+    axes.push({
+      key: `skill-${req.name}`,
+      label: `${req.name} Lv${req.level}`,
+      current: null,
+      target: req.level,
+      met: false,
+    });
+  }
+
+  // Roubles axis (TarkovTracker doesn't expose currency)
+  axes.push({
+    key: 'roubles',
+    label: `${(tier.roublesRequired / 1_000_000).toFixed(0)}M ₽`,
+    current: null,
+    target: tier.roublesRequired,
+    met: false,
+  });
+
+  return axes;
 }
 
 function computeGoalProgress(
@@ -109,9 +228,39 @@ function computeGoalProgress(
   allTasks: TarkovTask[],
   progress: ProgressData | null,
   prestigeTarget: PrestigeTarget,
+  hideoutStations: HideoutStation[],
 ): GoalProgress {
   const goalTasks = getGoalTasks(goalId, allTasks, progress, prestigeTarget);
-  return computeProgressForTasks(goalTasks, progress);
+  const questProgress = computeProgressForTasks(goalTasks, progress);
+
+  if (goalId !== 'prestige') return questProgress;
+
+  const axes = computePrestigeAxes(prestigeTarget, progress, questProgress, hideoutStations);
+  const tracked = axes.filter((a) => a.current !== null);
+  const trackedMet = tracked.filter((a) => a.met).length;
+  const percentage = tracked.length > 0 ? Math.round((trackedMet / tracked.length) * 100) : 0;
+
+  const result: GoalProgress = {
+    ...questProgress,
+    percentage,
+    prestigeAxes: axes,
+  };
+
+  const tier = PRESTIGE_TIERS[prestigeTarget];
+  if (tier && !tier.requiresCollector && progress) {
+    const completedIds = new Set(
+      progress.tasksProgress.filter((t) => t.complete).map((t) => t.id)
+    );
+    const playerLevel = progress.playerLevel ?? 0;
+    result.xpRecommendedTasks = allTasks
+      .filter((t) => t.kappaRequired !== false)
+      .filter((t) => !completedIds.has(t.id))
+      .filter((t) => (t.minPlayerLevel ?? 0) <= playerLevel)
+      .filter((t) => (t.taskRequirements ?? []).every((r) => completedIds.has(r.task.id)))
+      .sort((a, b) => (b.experience ?? 0) - (a.experience ?? 0));
+  }
+
+  return result;
 }
 
 function computeProgressForTasks(
@@ -144,18 +293,28 @@ function computeProgressForTasks(
 // ── Hook ────────────────────────────────────────────────────────
 
 export function useGoalState() {
-  const [activeGoal, setActiveGoalState] = useState<GoalId | null>(() => readGoal());
-  const [prestigeTarget, setPrestigeTargetState] = useState<PrestigeTarget>(() => readPrestigeTarget());
-  // Scope per goal — stored as a Map so each goal's last scope survives switches.
-  const [scopeByGoal, setScopeByGoal] = useState<Record<GoalId, ScopeId>>(() => ({
-    prestige: readScope('prestige'),
-    kappa: readScope('kappa'),
-    'story-endings': readScope('story-endings'),
-    lightkeeper: readScope('lightkeeper'),
-  }));
+  const [activeGoal, setActiveGoalState] = useState<GoalId | null>(null);
+  const [prestigeTarget, setPrestigeTargetState] = useState<PrestigeTarget>(DEFAULT_PRESTIGE_TARGET);
+  const [scopeByGoal, setScopeByGoal] = useState<Record<GoalId, ScopeId>>({
+    prestige: ALL_SCOPE.id,
+    kappa: ALL_SCOPE.id,
+    'story-endings': ALL_SCOPE.id,
+    lightkeeper: ALL_SCOPE.id,
+  });
+
+  useEffect(() => {
+    setActiveGoalState(readGoal());
+    setPrestigeTargetState(readPrestigeTarget());
+    setScopeByGoal({
+      prestige: readScope('prestige'),
+      kappa: readScope('kappa'),
+      'story-endings': readScope('story-endings'),
+      lightkeeper: readScope('lightkeeper'),
+    });
+  }, []);
 
   const { progress } = usePlayerState();
-  const { tasks: gameTasks, dataLoaded } = useGameData();
+  const { tasks: gameTasks, hideoutStations, dataLoaded } = useGameData();
 
   const setActiveGoal = useCallback((id: GoalId) => {
     setActiveGoalState(id);
@@ -180,10 +339,10 @@ export function useGoalState() {
     if (!dataLoaded || gameTasks.length === 0) return null;
     const map = new Map<GoalId, GoalProgress>();
     for (const goal of GOALS) {
-      map.set(goal.id, computeGoalProgress(goal.id, gameTasks, progress, prestigeTarget));
+      map.set(goal.id, computeGoalProgress(goal.id, gameTasks, progress, prestigeTarget, hideoutStations));
     }
     return map;
-  }, [gameTasks, dataLoaded, progress, prestigeTarget]);
+  }, [gameTasks, dataLoaded, progress, prestigeTarget, hideoutStations]);
 
   const activeGoalProgress = activeGoal && allGoalProgress
     ? allGoalProgress.get(activeGoal) ?? null
@@ -198,7 +357,17 @@ export function useGoalState() {
     if (directiveScope === ALL_SCOPE.id) return activeGoalProgress;
     const filteredOpen = filterTasksByScope(activeGoal, directiveScope, activeGoalProgress.openTasks);
     const filteredDone = filterTasksByScope(activeGoal, directiveScope, activeGoalProgress.completedTasks);
-    return computeProgressForTasks([...filteredOpen, ...filteredDone], progress);
+    const scoped = computeProgressForTasks([...filteredOpen, ...filteredDone], progress);
+    if (activeGoalProgress.prestigeAxes) {
+      scoped.prestigeAxes = activeGoalProgress.prestigeAxes;
+      scoped.percentage = activeGoalProgress.percentage;
+    }
+    if (activeGoalProgress.xpRecommendedTasks) {
+      scoped.xpRecommendedTasks = directiveScope === ALL_SCOPE.id
+        ? activeGoalProgress.xpRecommendedTasks
+        : filterTasksByScope(activeGoal, directiveScope, activeGoalProgress.xpRecommendedTasks);
+    }
+    return scoped;
   }, [activeGoal, directiveScope, activeGoalProgress, progress]);
 
   return {

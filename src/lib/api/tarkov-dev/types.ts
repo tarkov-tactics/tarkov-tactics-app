@@ -15,9 +15,11 @@ export interface TarkovItem {
 export interface TarkovTask {
   id: string;
   name: string;
+  wikiLink: string;
   trader: { name: string };
   map: { name: string } | null;
   minPlayerLevel: number;
+  experience: number;
   kappaRequired?: boolean;
   taskRequirements?: Array<{ task: { id: string; name: string } }>;
   objectives: TarkovObjective[];

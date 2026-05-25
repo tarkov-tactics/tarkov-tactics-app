@@ -1,6 +1,6 @@
 # Feature Spec: Offline & Error Resilience
 
-> Status: `done`
+> Status: `in-progress` (error boundary only — caching and resilience patterns pending)
 > Priority: `P1`
 > Feature: `shared`
 
@@ -22,24 +22,26 @@ Make the app resilient to API failures, network issues, and rate limiting. When 
 ## UI Components
 | Component | Location | Type | Description |
 |-----------|----------|------|-------------|
-| `ErrorBoundary` | `components/shared/error-boundary.tsx` | Client | Catches render errors, shows recovery UI |
-| `DataFreshnessIndicator` | `components/shared/data-freshness.tsx` | Client | Shows "Updated X ago" with stale warning |
-| `RetryBanner` | `components/shared/retry-banner.tsx` | Client | Dismissable banner with retry action |
-| `RateLimitNotice` | `components/shared/rate-limit-notice.tsx` | Client | Shows countdown timer when rate limited |
-| `EmptyState` | `components/shared/empty-state.tsx` | Client | Generic empty state with icon, message, action |
+| `ErrorBoundary` | `components/error-boundary.tsx` | Client | Catches render errors, shows recovery UI ✅ |
+| `RetryPanel` | `components/retry-panel.tsx` | Client | Retry button with timestamp ✅ (not yet integrated into error flows) |
+| `GlobalError` | `app/global-error.tsx` | Client | Fallback error page ✅ |
+| `DataFreshnessIndicator` | `components/shared/data-freshness.tsx` | Client | Shows "Updated X ago" with stale warning — **not yet implemented** |
+| `RateLimitNotice` | `components/shared/rate-limit-notice.tsx` | Client | Shows countdown timer when rate limited — **not yet implemented** |
+| `EmptyState` | `components/shared/empty-state.tsx` | Client | Generic empty state with icon, message, action — **not yet implemented** |
 
 ## Requirements
 ### Functional
-- [ ] Cache TarkovTracker progress in `localStorage` as fallback
-- [ ] Cache tarkov.dev game data in Next.js server-side cache (revalidation-based)
-- [ ] On API failure: serve cached data + show staleness indicator
-- [ ] On rate limit (429): show countdown timer from `Retry-After` header
-- [ ] On network error: show "No connection" banner with retry button
-- [ ] On TarkovTracker auth error: prompt to re-enter token
-- [ ] Each page has an error boundary that catches unexpected render crashes
-- [ ] Error boundaries show: what went wrong, retry button, link to report issue
-- [ ] Data freshness indicator in header or footer: "Player data updated 3m ago"
-- [ ] Stale data (>10 min) shows warning badge
+- [ ] Cache TarkovTracker progress in `localStorage` as fallback — not yet implemented
+- [ ] Cache tarkov.dev game data in Next.js server-side cache (revalidation-based) — not yet implemented
+- [ ] On API failure: serve cached data + show staleness indicator — not yet implemented
+- [ ] On rate limit (429): show countdown timer from `Retry-After` header — not yet implemented
+- [ ] On network error: show "No connection" banner with retry button — RetryPanel exists but not integrated
+- [ ] On TarkovTracker auth error: prompt to re-enter token — not yet implemented
+- [x] Global error boundary catches unexpected render crashes (`error-boundary.tsx` + `global-error.tsx`)
+- [ ] Per-page error boundaries — not yet implemented (only global exists)
+- [ ] Error boundaries show link to report issue — not yet implemented
+- [ ] Data freshness indicator in header or footer: "Player data updated 3m ago" — not yet implemented
+- [ ] Stale data (>10 min) shows warning badge — not yet implemented
 
 ### Non-Functional
 - [ ] Cached data should survive browser restarts

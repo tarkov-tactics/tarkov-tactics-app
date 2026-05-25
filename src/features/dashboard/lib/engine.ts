@@ -13,6 +13,54 @@ import type { VibeModifier } from '@/features/vibes/types';
 import { getBossIntel } from './boss-intel';
 import { getCombatProtocols } from './combat-protocols';
 
+// ── Actionable Task Filter ─────────────────────────────────────────
+
+function getActionableTaskIds(
+  progress: ProgressData,
+  tasks: TarkovTask[],
+): Set<string> {
+  const completedIds = new Set(
+    progress.tasksProgress.filter((t) => t.complete).map((t) => t.id)
+  );
+  const failedIds = new Set(
+    progress.tasksProgress.filter((t) => t.failed).map((t) => t.id)
+  );
+
+  const actionable = new Set<string>();
+  for (const task of tasks) {
+    if (completedIds.has(task.id) || failedIds.has(task.id)) continue;
+    if ((task.minPlayerLevel ?? 0) > progress.playerLevel) continue;
+
+    const prereqsMet = (task.taskRequirements ?? []).every(
+      (req) => completedIds.has(req.task.id)
+    );
+    if (prereqsMet) actionable.add(task.id);
+  }
+  return actionable;
+}
+
+// ── Early-Game Progression Bonus ──────────────────────────────────
+
+const FLEA_MARKET_LEVEL = 15;
+const TRADER_UNLOCK_QUESTS = new Set([
+  'Debut', 'Shootout Picnic', 'Checking', 'Shortage',
+  'Introduction', 'Acquaintance', 'Friend From the West - Part 1',
+]);
+
+function getProgressionMultiplier(
+  task: TarkovTask,
+  playerLevel: number,
+): number {
+  if (playerLevel >= FLEA_MARKET_LEVEL) return 1.0;
+
+  if (TRADER_UNLOCK_QUESTS.has(task.name)) return 2.5;
+
+  const unlocksOtherTasks = (task.taskRequirements?.length ?? 0) === 0;
+  if (unlocksOtherTasks && task.minPlayerLevel <= 5) return 1.5;
+
+  return 1.0;
+}
+
 // ── Map Scoring ────────────────────────────────────────────────────
 
 interface MapScore {
@@ -28,16 +76,24 @@ function scoreMap(
   tasks: TarkovTask[],
   vibeModifier: VibeModifier,
   maps: TarkovMap[],
-  teammates: ProgressData[]
+  teammates: ProgressData[],
+  playerLevel: number,
 ): MapScore {
-  // Count open quest objectives on this map
   let questCount = 0;
+  let weightedScore = 0;
   for (const task of tasks) {
     if (!playerOpenTaskIds.has(task.id)) continue;
+    const multiplier = getProgressionMultiplier(task, playerLevel);
     for (const obj of task.objectives) {
-      if (obj.maps.some((m) => m.name === mapName)) questCount++;
+      if (obj.maps.some((m) => m.name === mapName)) {
+        questCount++;
+        weightedScore += multiplier;
+      }
     }
-    if (task.map?.name === mapName) questCount++;
+    if (task.map?.name === mapName) {
+      questCount++;
+      weightedScore += multiplier;
+    }
   }
 
   // Vibe map preference
@@ -73,7 +129,7 @@ function scoreMap(
   }
 
   const score =
-    questCount * vibeMultiplier * (1 - riskPenalty) + teamOverlap * 0.3;
+    weightedScore * vibeMultiplier * (1 - riskPenalty) + teamOverlap * 0.3;
 
   return { mapName, score, questCount, teamOverlap };
 }
@@ -105,6 +161,115 @@ function computeLoadout(playerLevel: number, vibeModifier: VibeModifier): Loadou
 
 // ── POI Ranking ────────────────────────────────────────────────────
 
+interface MapPOI {
+  name: string;
+  lootTypes: string[];
+  risk: 'low' | 'medium' | 'high';
+}
+
+const MAP_POIS: Record<string, MapPOI[]> = {
+  'Ground Zero': [
+    { name: 'TerraGroup Parking Lot', lootTypes: ['electronics', 'medical', 'weapons'], risk: 'medium' },
+    { name: 'Mira Avenue Shops', lootTypes: ['food', 'medical', 'barter'], risk: 'low' },
+    { name: 'Police Checkpoint', lootTypes: ['weapons', 'ammo', 'armor'], risk: 'medium' },
+    { name: 'Southern Apartments', lootTypes: ['electronics', 'barter', 'medical'], risk: 'low' },
+    { name: 'Pinewood Hotel', lootTypes: ['valuables', 'electronics'], risk: 'medium' },
+  ],
+  'Customs': [
+    { name: 'Dorms (3-Story)', lootTypes: ['valuables', 'weapons', 'medical', 'quest'], risk: 'high' },
+    { name: 'Dorms (2-Story)', lootTypes: ['valuables', 'medical', 'quest'], risk: 'high' },
+    { name: 'Crack House', lootTypes: ['medical', 'electronics', 'barter'], risk: 'medium' },
+    { name: 'USEC Stash (Big Red)', lootTypes: ['weapons', 'ammo', 'armor'], risk: 'medium' },
+    { name: 'Gas Station', lootTypes: ['medical', 'food', 'barter'], risk: 'medium' },
+    { name: 'Warehouse (New Gas)', lootTypes: ['electronics', 'barter', 'weapons'], risk: 'low' },
+    { name: 'Military Checkpoint', lootTypes: ['ammo', 'weapons', 'armor'], risk: 'medium' },
+  ],
+  'Woods': [
+    { name: 'USEC Camp', lootTypes: ['weapons', 'ammo', 'armor', 'medical'], risk: 'medium' },
+    { name: 'Sawmill', lootTypes: ['weapons', 'valuables', 'quest'], risk: 'high' },
+    { name: 'Abandoned Village', lootTypes: ['food', 'barter', 'medical'], risk: 'low' },
+    { name: 'ZB-014 Bunker', lootTypes: ['electronics', 'medical', 'ammo'], risk: 'low' },
+    { name: 'Sunken Village', lootTypes: ['medical', 'barter', 'food'], risk: 'low' },
+    { name: 'Scav House', lootTypes: ['barter', 'weapons', 'ammo'], risk: 'medium' },
+  ],
+  'Shoreline': [
+    { name: 'Resort (East Wing)', lootTypes: ['valuables', 'electronics', 'medical', 'weapons'], risk: 'high' },
+    { name: 'Resort (West Wing)', lootTypes: ['valuables', 'electronics', 'medical'], risk: 'high' },
+    { name: 'Pier', lootTypes: ['barter', 'food', 'electronics'], risk: 'medium' },
+    { name: 'Village', lootTypes: ['medical', 'food', 'barter'], risk: 'low' },
+    { name: 'Power Station', lootTypes: ['electronics', 'barter', 'weapons'], risk: 'medium' },
+    { name: 'Gas Station', lootTypes: ['medical', 'food', 'electronics'], risk: 'medium' },
+  ],
+  'Interchange': [
+    { name: 'IDEA Store', lootTypes: ['barter', 'electronics', 'food'], risk: 'medium' },
+    { name: 'OLI Store', lootTypes: ['barter', 'electronics', 'fuel'], risk: 'medium' },
+    { name: 'Goshan Store', lootTypes: ['food', 'medical', 'barter'], risk: 'medium' },
+    { name: 'KIBA Store', lootTypes: ['weapons', 'armor', 'ammo'], risk: 'high' },
+    { name: 'Tech Stores (2nd Floor)', lootTypes: ['electronics', 'valuables'], risk: 'high' },
+    { name: 'Power Station', lootTypes: ['electronics', 'barter'], risk: 'low' },
+  ],
+  'Reserve': [
+    { name: 'Black Knight', lootTypes: ['weapons', 'ammo', 'electronics'], risk: 'high' },
+    { name: 'White Knight', lootTypes: ['weapons', 'armor', 'ammo'], risk: 'high' },
+    { name: 'Marked Room (RB-BK)', lootTypes: ['valuables', 'weapons', 'rare'], risk: 'high' },
+    { name: 'Underground Bunker', lootTypes: ['electronics', 'medical', 'ammo'], risk: 'medium' },
+    { name: 'Helicopter Area', lootTypes: ['weapons', 'ammo', 'valuables'], risk: 'high' },
+  ],
+  'Lighthouse': [
+    { name: 'Water Treatment Plant', lootTypes: ['electronics', 'valuables', 'weapons'], risk: 'high' },
+    { name: 'Chalet Area', lootTypes: ['valuables', 'electronics', 'barter'], risk: 'medium' },
+    { name: 'Rogue Camp', lootTypes: ['weapons', 'ammo', 'armor'], risk: 'high' },
+    { name: 'Southern Road', lootTypes: ['barter', 'food', 'medical'], risk: 'low' },
+  ],
+  'Factory': [
+    { name: 'Office Area', lootTypes: ['electronics', 'valuables', 'weapons'], risk: 'high' },
+    { name: 'Gate 3 Corridor', lootTypes: ['weapons', 'ammo'], risk: 'high' },
+    { name: 'Showers', lootTypes: ['medical', 'barter'], risk: 'medium' },
+  ],
+  'Streets of Tarkov': [
+    { name: 'Concordia Apartments', lootTypes: ['valuables', 'electronics', 'medical'], risk: 'high' },
+    { name: 'Lexos Car Dealership', lootTypes: ['valuables', 'electronics'], risk: 'medium' },
+    { name: 'Pinewood Hotel', lootTypes: ['valuables', 'electronics', 'barter'], risk: 'medium' },
+    { name: 'Cardinal Building', lootTypes: ['electronics', 'weapons'], risk: 'high' },
+    { name: 'Abandoned Factory', lootTypes: ['barter', 'weapons', 'ammo'], risk: 'medium' },
+  ],
+  'The Lab': [
+    { name: 'Manager Office', lootTypes: ['valuables', 'electronics', 'rare'], risk: 'high' },
+    { name: 'Weapons Testing Area', lootTypes: ['weapons', 'ammo', 'armor'], risk: 'high' },
+    { name: 'Medical Block', lootTypes: ['medical', 'electronics'], risk: 'medium' },
+    { name: 'Server Room', lootTypes: ['electronics', 'valuables'], risk: 'medium' },
+  ],
+};
+
+const ITEM_LOOT_CATEGORIES: Record<string, string[]> = {
+  'salewa': ['medical'],
+  'morphine': ['medical'],
+  'cms': ['medical'],
+  'ifak': ['medical'],
+  'medkit': ['medical'],
+  'module-3m': ['armor'],
+  'body armor': ['armor'],
+  'shotgun': ['weapons'],
+  'pistol': ['weapons'],
+  'rifle': ['weapons'],
+  'mp-133': ['weapons'],
+  'toz': ['weapons'],
+  'dogtag': ['quest'],
+  'whiskey': ['food'],
+  'tarcola': ['food'],
+  'figurine': ['barter', 'valuables'],
+  'flash drive': ['electronics'],
+  'usb': ['electronics'],
+};
+
+function matchItemToLootCategory(description: string): string[] {
+  const lower = description.toLowerCase();
+  for (const [keyword, categories] of Object.entries(ITEM_LOOT_CATEGORIES)) {
+    if (lower.includes(keyword)) return categories;
+  }
+  return [];
+}
+
 function rankPOIs(
   mapName: string,
   tasks: TarkovTask[],
@@ -112,29 +277,81 @@ function rankPOIs(
   vibeModifier: VibeModifier,
   maps: TarkovMap[]
 ): PrioritizedPOI[] {
-  const pois: PrioritizedPOI[] = [];
   const mapData = maps.find((m) => m.name === mapName);
+  const knownPOIs = MAP_POIS[mapName] ?? [];
 
-  // Quest-driven POIs
+  const neededCategories = new Set<string>();
+  const neededItemNames = new Map<string, Set<string>>();
+  const questContext = new Map<string, string[]>();
+
   for (const task of tasks) {
     if (!playerOpenTaskIds.has(task.id)) continue;
     for (const obj of task.objectives) {
-      if (obj.maps.some((m) => m.name === mapName)) {
-        pois.push({
-          name: `${task.trader.name}: ${obj.description}`,
-          lootExpectation: task.name,
-          riskLevel: vibeModifier.riskTolerance === 'low' ? 'low' : 'medium',
-        });
+      const mapsForObj = obj.maps.map((m) => m.name);
+      const taskMap = task.map?.name ?? '';
+      const isMapSpecific = mapsForObj.includes(mapName) || (mapsForObj.length === 0 && taskMap === mapName);
+      const isItemObj = ['giveItem', 'findItem', 'findQuestItem'].includes(obj.type);
+      const isAnyMap = mapsForObj.length === 0 && !taskMap;
+
+      if (!isMapSpecific && !(isItemObj && isAnyMap)) continue;
+
+      const categories = matchItemToLootCategory(obj.description);
+      for (const cat of categories) neededCategories.add(cat);
+
+      const itemMatch = obj.description.match(/(?:Find|Hand over|Obtain)\s+(?:the\s+)?(?:found in raid\s+)?(?:item:\s+)?(.+)/i);
+      const itemName = itemMatch?.[1]?.trim().replace(/\s*\(.*\)$/, '').replace(/s$/, '') ?? null;
+
+      for (const poi of knownPOIs) {
+        const overlaps = poi.lootTypes.some((lt) => categories.includes(lt));
+        if (overlaps || isMapSpecific) {
+          const ctx = questContext.get(poi.name) ?? [];
+          ctx.push(`${task.name}: ${obj.description}`);
+          questContext.set(poi.name, ctx);
+
+          if (itemName && overlaps) {
+            const items = neededItemNames.get(poi.name) ?? new Set();
+            items.add(itemName);
+            neededItemNames.set(poi.name, items);
+          }
+        }
       }
     }
   }
 
-  // Boss POIs
+  const pois: PrioritizedPOI[] = knownPOIs
+    .map((poi) => {
+      const matchingCategories = poi.lootTypes.filter((lt) => neededCategories.has(lt));
+      const quests = questContext.get(poi.name) ?? [];
+      const items = neededItemNames.get(poi.name);
+
+      const reasons: string[] = [];
+      if (items && items.size > 0) {
+        reasons.push([...items].slice(0, 2).join(', '));
+      }
+      if (matchingCategories.length > 0) {
+        reasons.push(matchingCategories.join(' · ') + ' loot');
+      }
+
+      return {
+        name: poi.name,
+        lootExpectation: reasons.length > 0
+          ? reasons.join(' · ')
+          : poi.lootTypes.join(', '),
+        riskLevel: poi.risk,
+        neededItems: items ? [...items] : undefined,
+        lootCategories: matchingCategories.length > 0 ? matchingCategories : poi.lootTypes,
+        questObjectives: quests.length > 0 ? quests : undefined,
+        _relevance: matchingCategories.length + quests.length + (items?.size ?? 0) * 2,
+      };
+    })
+    .sort((a, b) => b._relevance - a._relevance)
+    .map(({ _relevance, ...poi }) => poi);
+
   if (vibeModifier.poiPriority === 'boss' && mapData) {
     for (const boss of mapData.bosses) {
       if (boss.spawnChance > 0) {
-        pois.push({
-          name: `${boss.name} spawn`,
+        pois.unshift({
+          name: `${boss.name} Spawn`,
           lootExpectation: `Boss loot (${Math.round(boss.spawnChance * 100)}% spawn)`,
           riskLevel: 'high',
         });
@@ -268,17 +485,13 @@ export function computeRaidPlan(
   teammates: ProgressData[],
   hasGoonSighting = false
 ): RaidPlanResult {
-  const playerOpenTaskIds = new Set(
-    progress.tasksProgress
-      .filter((t) => !t.complete && !t.failed)
-      .map((t) => t.id)
-  );
+  const playerOpenTaskIds = getActionableTaskIds(progress, tasks);
 
   // Score all maps
   const uniqueMapNames = [...new Set(maps.map((m) => m.name))];
   const mapScores = uniqueMapNames
     .map((name) =>
-      scoreMap(name, playerOpenTaskIds, tasks, vibeModifier, maps, teammates)
+      scoreMap(name, playerOpenTaskIds, tasks, vibeModifier, maps, teammates, progress.playerLevel)
     )
     .filter((s) => s.score > 0)
     .sort((a, b) => b.score - a.score);

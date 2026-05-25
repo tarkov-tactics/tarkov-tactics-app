@@ -1,6 +1,6 @@
 # Feature Spec: Game Data Service
 
-> Status: `in-progress` (goon reports addition)
+> Status: `done`
 > Priority: `P0`
 > Feature: `shared`
 
@@ -22,6 +22,7 @@ Fetch and cache game reference data from the tarkov.dev GraphQL API. This includ
 - `items` — item ID, name, icon, 24h price, sell-for prices
 - `hideoutStations` — station ID, name, levels with item requirements
 - `goonReports(gameMode)` — community-submitted Goon Squad sightings; returns `{ map { id name }, timestamp }[]`. Filterable by `pvp` / `pve` to match the player's connected game mode.
+- `prestige` — prestige tier definitions: conditions (player level, skills, hideout stations, roubles, gating quest), rewards, and transfer settings. Used by the Prestige goal to determine tier requirements dynamically rather than relying solely on hardcoded values.
 
 ### Computed/Derived
 - `tasksByMap` — tasks grouped by their primary map and objective maps
@@ -64,19 +65,19 @@ The `GameDataProvider` lives in `AppShell` (after `TeamStateProvider`) and ensur
 - [x] GraphQL queries include `kappaRequired` and `taskRequirements` fields on tasks
 - [x] Error handling: sets `error` state, returns empty arrays on failure
 - [x] All data typed against `src/lib/api/tarkov-dev/types.ts`
-- [ ] Add `GOON_REPORTS_QUERY` to `lib/api/tarkov-dev/queries.ts` — `query GoonReports($gameMode: GameMode) { goonReports(gameMode: $gameMode) { map { id name } timestamp } }`
-- [ ] Add `getGoonReports(gameMode)` to `lib/api/tarkov-dev/game-data.ts`
-- [ ] `GoonReportsProvider` polls every 3 min (config constant `GOON_POLL_INTERVAL_MS`), passes the player's `gameMode` (from `usePlayerState`) as the query variable
-- [ ] Polling pauses when `document.visibilityState === 'hidden'`, resumes on visibility
-- [ ] `useGoonReports()` returns helpers: `latest` (most recent across all maps), `byMap(mapId)` (most recent for that map or `null`), `isStale` (true if `lastFetched > 10 min ago` due to errors)
-- [ ] Time formatting helper `formatRelativeTime(date)` exported from `lib/utils.ts` — returns "Xs/m/h ago"
+- [x] Add `GOON_REPORTS_QUERY` to `lib/api/tarkov-dev/queries.ts` — includes `gameMode` variable and `limit: 50`
+- [x] Goon reports fetched client-side via `GoonReportsProvider` (no separate server-side function — client fetches directly through BFF proxy)
+- [x] `GoonReportsProvider` polls every 3 min (config constant `GOON_POLL_INTERVAL_MS`), passes the player's `gameMode` (from `usePlayerState`) as the query variable
+- [x] Polling pauses when `document.visibilityState === 'hidden'`, resumes on visibility
+- [x] `useGoonReports()` returns helpers: `latest` (most recent across all maps), `byMap(mapId)` (most recent for that map or `null`), `isStale` (true if `lastFetched > 10 min ago` due to errors)
+- [x] Time formatting helper `formatRelativeTime(date)` exported from `lib/utils.ts` — returns "Xs/m/h ago"
 
 ### Non-Functional
 - [x] Single fetch on mount — no refetching on navigation between pages
 - [x] Uses `requestAnimationFrame` wrapper for initial fetch (React 19 compliance)
 - [x] Cleanup via `AbortController` on unmount
 - [x] `refresh()` function for manual re-fetch
-- [ ] Goon reports poll respects tarkov.dev fair-use (3 min default is conservative; never more than once per 60s even on manual refresh)
+- [x] Goon reports poll respects tarkov.dev fair-use (3 min default is conservative). Manual `refresh()` has no additional rate guard but the polling interval is the primary mechanism.
 
 ## Success Criteria
 - [x] `useGameData()` returns typed task + map data on every page

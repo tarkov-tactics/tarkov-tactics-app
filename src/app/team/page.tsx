@@ -1,8 +1,10 @@
 "use client";
 
+import { useMemo } from "react";
 import { RefreshCw, Users as UsersIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePlayerState } from "@/hooks/use-player-state";
+import { useGameData } from "@/hooks/use-game-data";
 import { useTeamState, getSharedOpenTasks } from "@/hooks/use-team-state";
 import { TeammateCard } from "@/features/team/components/teammate-card";
 import { TeamPermissionPrompt } from "@/features/team/components/team-permission-prompt";
@@ -10,8 +12,15 @@ import { PageHeader } from "@/components/layout/page-header";
 
 export default function TeamPage() {
   const { isConnected, progress } = usePlayerState();
+  const { tasks: gameTasks } = useGameData();
   const { teammates, hasTeamPermission, isLoading, lastUpdated, refresh } =
     useTeamState();
+
+  const taskNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const t of gameTasks) map.set(t.id, t.name);
+    return map;
+  }, [gameTasks]);
 
   const playerOpenTaskIds = new Set(
     progress?.tasksProgress
@@ -111,7 +120,7 @@ export default function TeamPage() {
                         key={taskId}
                         className="flex items-center justify-between rounded-lg border bg-card px-4 py-2.5 text-sm"
                       >
-                        <span className="truncate font-medium">{taskId}</span>
+                        <span className="truncate font-medium">{taskNameById.get(taskId) ?? taskId}</span>
                         <span className="flex items-center gap-1 text-xs text-primary shrink-0 ml-2">
                           <UsersIcon className="size-3" />
                           {names.length} teammate{names.length > 1 ? "s" : ""}

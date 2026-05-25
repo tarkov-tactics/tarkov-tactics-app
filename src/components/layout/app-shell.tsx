@@ -1,4 +1,5 @@
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { EtlDataProvider } from "@/hooks/use-etl-data";
 import { PlayerStateProvider } from "@/hooks/use-player-state";
 import { TeamStateProvider } from "@/hooks/use-team-state";
 import { GameDataProvider } from "@/hooks/use-game-data";
@@ -8,11 +9,12 @@ import { Header } from "./header";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <PlayerStateProvider>
-      <TeamStateProvider>
-        <GameDataProvider>
-          <GoonReportsProvider>
-            <TooltipProvider>
+    <EtlDataProvider>
+      <PlayerStateProvider>
+        <TeamStateProvider>
+          <GameDataProvider>
+            <GoonReportsProvider>
+              <TooltipProvider>
               <div className="flex h-full">
                 <Sidebar />
                 <div className="flex flex-1 flex-col overflow-hidden">
@@ -21,9 +23,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
             </TooltipProvider>
-          </GoonReportsProvider>
-        </GameDataProvider>
-      </TeamStateProvider>
-    </PlayerStateProvider>
+            </GoonReportsProvider>
+          </GameDataProvider>
+        </TeamStateProvider>
+      </PlayerStateProvider>
+    </EtlDataProvider>
   );
 }

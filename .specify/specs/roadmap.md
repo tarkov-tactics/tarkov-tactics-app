@@ -86,6 +86,22 @@ Specs are ordered by dependency — each one builds on the previous.
 
 ---
 
+### Layer 5: Ranking System
+
+The ranking system replaces the simplified scoring formulas in spec-006 with a full four-stage pipeline. All specs are `ranking` feature type.
+
+| # | Spec | Feature | What it delivers |
+|---|------|---------|-----------------|
+| [`009`](009-etl-data-loader.md) | **ETL Data Loader** | `ranking` | Fetches, validates (SHA-256), and caches pre-computed data from the companion ETL pipeline. Defensive fallback per file. |
+| [`010`](010-requirement-impact-scoring.md) | **Requirement Impact Scoring** | `ranking` | Stage 0 (open requirements) + Stage 1 (`R(r)`): unlock graph, gating value, passive-quest scoring with constraint decomposition. |
+| [`011`](011-item-priority-scoring.md) | **Item Priority Scoring** | `ranking` | Stage 2 (`I(i)`): roll-up from requirement impact to items, FIR handling, stash blind spot. |
+| [`012`](012-poi-cluster-generation-scoring.md) | **POI Cluster Generation & Scoring** | `ranking` | Stage 3 cluster generation + `P(c)` scoring: spatial clustering, loot/objective/boss gains, named POI layer. |
+| [`013`](013-key-economics-module.md) | **Key Economics Module** | `ranking` | Stage 3 sub-module: amortized key cost, degraded sub-clusters for unobtainable keys, loadout cost integration. |
+| [`014`](014-map-scoring-route-optimization.md) | **Map Scoring & Route Optimization** | `ranking` | Stage 4 (`M(m)`): spawn clustering, route construction, dispersion-penalized map aggregation, constrained-quest bonus. |
+| [`015`](015-ranking-loadout-interface.md) | **Ranking-to-Loadout Interface Contract** | `ranking` | Structured output payload: map, routes, watchlist, constraints, reason structures. |
+
+---
+
 ## Dependency Graph
 
 ```
@@ -96,7 +112,16 @@ Specs are ordered by dependency — each one builds on the previous.
  ├── 004 (Goals) ←── enhanced by 007
  ├── 005 (Vibes) ←── enhanced by 007
  └── 006 (Dashboard) ←── depends on 002, 003, 004, 005, 007
-      └── 008 (Error Resilience)
+      ├── 008 (Error Resilience)
+      └── Ranking System (009–015) ←── replaces 006's inline scoring formulas
+           009 (ETL Data Loader) ←── foundation, no ranking deps
+            ├── 010 (Requirement Impact) ←── depends on 009
+            │    └── 011 (Item Priority) ←── depends on 010
+            │         ├── 012 (POI Clusters) ←── depends on 011, 009
+            │         └── 013 (Key Economics) ←── depends on 011
+            │              └── 014 (Map Scoring) ←── depends on 012, 013, 009
+            │                   └── 015 (Ranking-Loadout Interface) ←── depends on 014
+            └── (all ranking specs also depend on 002, 003, 004, 005)
 ```
 
 ## How to Start
@@ -107,4 +132,4 @@ Pick a spec number and tell me:
 
 I'll draft it using the template, you review and refine, then we move to plan → tasks → build.
 
-**Next recommended spec: `spec-003` (Game Data Service)** — it's the last data layer piece before we can build features.
+**Next recommended spec: `spec-009` (ETL Data Loader)** — it's the foundation of the ranking system and must be implemented before the other ranking specs.

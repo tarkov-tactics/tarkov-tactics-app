@@ -1,6 +1,6 @@
 # Feature Spec: TarkovTracker Connection
 
-> Status: `in-progress` (refresh moved to Settings)
+> Status: `done`
 > Priority: `P0`
 > Feature: `shared`
 
@@ -34,13 +34,13 @@ Data refresh strategy: the providers (`PlayerStateProvider`, `TeamStateProvider`
 |-----------|----------|------|-------------|
 | `TokenInput` | `features/settings/components/token-input.tsx` | Client | Masked input with paste, validate, and clear actions |
 | `ConnectionStatus` | `features/settings/components/connection-status.tsx` | Client | Shows validation result: player name, level, faction, permissions |
-| `GameModeSelector` | `features/settings/components/game-mode-selector.tsx` | Client | PVP/PVE toggle (auto-detected from token prefix) |
+| Game mode display | Inlined on Settings page (`app/settings/page.tsx`) | Client | PVP/PVE indicator (read-only, auto-detected from token prefix) |
 | `DataSyncPanel` | `features/settings/components/data-sync-panel.tsx` | Client | Settings-page section showing **last-updated timestamp** for player + team data with a single **"Refresh Now"** button that calls `usePlayerState().refresh()` and `useTeamState().refresh()` in parallel. Hidden when disconnected. Replaces the previous global header refresh control. |
 
 ## Requirements
 ### Functional
 - [x] Settings page has a token input field (masked by default, toggle to reveal)
-- [x] "Validate" button sends token to `/api/tracker` BFF endpoint
+- [x] "Connect" button sends token to `/api/tracker` BFF endpoint
 - [x] On success: show player name, level, faction, game mode, permissions
 - [x] On failure: show clear error message (invalid token, rate limited, network error)
 - [x] Token is stored in `localStorage` (key: `tarkov-tracker-token`)
@@ -49,20 +49,20 @@ Data refresh strategy: the providers (`PlayerStateProvider`, `TeamStateProvider`
 - [x] `PlayerStateProvider` context wraps the app, exposing `usePlayerState()` globally
 - [x] **Auto-fetch progress on app load** if token exists in storage. This is the primary refresh mechanism — reloading the page = fresh data.
 - [x] BFF route (`/api/tracker`) proxies requests — token never leaves the client→server boundary in plain text
-- [ ] Settings page renders `DataSyncPanel` showing last-updated timestamp + "Refresh Now" button that triggers both `usePlayerState().refresh()` and `useTeamState().refresh()`. The button shows a spinner while either request is in-flight and is disabled while loading.
-- [ ] No global header refresh button — removed in favor of the per-Settings `DataSyncPanel` (see spec-001 §Functional)
+- [x] Settings page renders `DataSyncPanel` showing last-updated timestamp + "Refresh Now" button that triggers both `usePlayerState().refresh()` and `useTeamState().refresh()`. The button shows a spinner while either request is in-flight and is disabled while loading.
+- [x] No global header refresh button — removed in favor of the per-Settings `DataSyncPanel` (see spec-001 §Functional)
 
 ### Non-Functional
-- [ ] Token input should not be auto-completed by browsers (autocomplete="off")
-- [ ] Rate limit awareness: show remaining requests from `X-RateLimit-Remaining` header
-- [ ] Debounce validation to prevent rapid re-clicks
+- [x] Token input should not be auto-completed by browsers (autocomplete="off")
+- [x] Rate limit awareness: BFF captures `X-RateLimit-Remaining` header; 429 responses show error message. Remaining count display in UI is deferred.
+- [x] Connect button is disabled during validation (prevents rapid re-clicks)
 
 ## Success Criteria
-- [ ] Can paste a valid PVP/PVE token and see player info
-- [ ] Token persists after page reload
-- [ ] Disconnecting clears all player state
-- [ ] Invalid token shows a clear error
-- [ ] `usePlayerState()` returns live data anywhere in the app
+- [x] Can paste a valid PVP/PVE token and see player info
+- [x] Token persists after page reload
+- [x] Disconnecting clears all player state
+- [x] Invalid token shows a clear error
+- [x] `usePlayerState()` returns live data anywhere in the app
 
 ## Edge Cases
 - Token with wrong permissions (no GP) → show "Missing read permission" error

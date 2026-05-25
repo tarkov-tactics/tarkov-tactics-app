@@ -2,6 +2,7 @@
 
 import type { TarkovTask } from "@/lib/api/tarkov-dev/types";
 import type { ProgressData } from "@/lib/api/tarkov-tracker/types";
+import { groupIntoQuestLines, getTopInProgressLines } from "../lib/quest-lines";
 
 interface OpenQuestsPreviewProps {
   openTasks: TarkovTask[];
@@ -9,56 +10,15 @@ interface OpenQuestsPreviewProps {
   playerProgress: ProgressData | null;
 }
 
-interface TraderChain {
-  trader: string;
-  total: number;
-  completed: number;
-  percentage: number;
-}
-
-function groupByTrader(
-  open: TarkovTask[],
-  done: TarkovTask[],
-): TraderChain[] {
-  const totals = new Map<string, { open: number; done: number }>();
-  for (const t of open) {
-    const cur = totals.get(t.trader.name) ?? { open: 0, done: 0 };
-    cur.open += 1;
-    totals.set(t.trader.name, cur);
-  }
-  for (const t of done) {
-    const cur = totals.get(t.trader.name) ?? { open: 0, done: 0 };
-    cur.done += 1;
-    totals.set(t.trader.name, cur);
-  }
-
-  const chains: TraderChain[] = [];
-  for (const [trader, { open, done }] of totals) {
-    const total = open + done;
-    if (total === 0) continue;
-    chains.push({
-      trader,
-      total,
-      completed: done,
-      percentage: Math.round((done / total) * 100),
-    });
-  }
-  // Highest in-progress chains first (>0% and <100%)
-  chains.sort((a, b) => {
-    const aActive = a.percentage > 0 && a.percentage < 100;
-    const bActive = b.percentage > 0 && b.percentage < 100;
-    if (aActive !== bActive) return aActive ? -1 : 1;
-    return b.percentage - a.percentage;
-  });
-  return chains;
-}
-
 export function OpenQuestsPreview({
   openTasks,
   completedTasks,
   playerProgress,
 }: OpenQuestsPreviewProps) {
-  const chains = groupByTrader(openTasks, completedTasks).slice(0, 3);
+  const lines = getTopInProgressLines(
+    groupIntoQuestLines(openTasks, completedTasks),
+    3,
+  );
 
   return (
     <section className="rounded-lg border border-border bg-card text-card-foreground">
@@ -72,25 +32,25 @@ export function OpenQuestsPreview({
       </div>
 
       <div className="p-4 space-y-3">
-        {chains.length === 0 ? (
+        {lines.length === 0 ? (
           <p className="text-xs text-muted-foreground">
             Connect to view in-progress quest chains.
           </p>
         ) : (
-          chains.map((chain) => (
-            <div key={chain.trader} className="space-y-1.5">
+          lines.map((line) => (
+            <div key={line.id} className="space-y-1.5">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm font-medium truncate">
-                  {chain.trader}
+                  {line.label}
                 </span>
                 <span className="text-[10px] font-mono text-primary font-bold shrink-0">
-                  {chain.percentage}%
+                  {line.completed}/{line.total}
                 </span>
               </div>
               <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full bg-primary transition-all duration-500"
-                  style={{ width: `${chain.percentage}%` }}
+                  style={{ width: `${line.percentage}%` }}
                 />
               </div>
             </div>

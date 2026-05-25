@@ -1,6 +1,6 @@
 # Feature Spec: Next Raid Dashboard
 
-> Status: `in-progress` (TTI layout adoption + goon sightings + density variants + vibe intel cards)
+> Status: `in-progress` (team indicators + progressive loading pending)
 > Priority: `P0`
 > Feature: `dashboard`
 
@@ -48,8 +48,9 @@ mapScore = Σ(questObjectivesOnMap × goalWeight)
          × (1 - riskPenalty if vibe.riskTolerance == 'low')
          + teamOverlapBonus
 ```
-- Count open quest objectives per map
+- Count **actionable** quest objectives per map (only quests whose prerequisites are satisfied)
 - Weight by active goal (Kappa weights ALL quests, Prestige weights tier-specific)
+- **Early-game progression bonus**: quests that unlock new traders or new maps receive a scoring multiplier. At low player levels (below flea market unlock), trader-unlocking and map-unlocking quests are critical progression gates and should be prioritized over general quest density.
 - Multiply by vibe's map preference modifier
 - **Team bonus**: `teamOverlapBonus = Σ(teammatesWithOpenObjectivesOnMap) × teamWeight`
   - Each teammate with open quests on this map adds a score bonus
@@ -72,9 +73,14 @@ poiScore = questObjectiveWeight
          + teamSharedObjectiveBonus
          - riskPenalty × (1 - vibe.riskTolerance)
 ```
-- Rank locations on the selected map by what the player needs
+- Rank **map locations** (not quest objectives) on the selected map by what the player needs
+- POIs must be named after recognizable map areas (e.g., "Parking Lot", "Machine Gun Position", "Old Gas Station"), not formatted as quest objectives (e.g., NOT "Prapor: Locate the Utyos machine gun"). Quest context is attached as secondary information within each POI.
+- POIs must only reference **actionable** quests — quests whose prerequisites are all satisfied. Locked quests (prerequisites not met) must not appear in the POI list, even if TarkovTracker reports them as "not complete". The engine must cross-reference `taskRequirements` against the player's completed tasks to determine actionability.
+- When quest objectives reference specific locations, group multiple objectives at the same location into a single POI
 - **Team bonus**: POIs where teammates also have objectives score higher
 - Show top 3-5 POIs with expected loot and key requirements
+- When quest objectives have no map restriction (e.g., "Find Salewas in raid" can be done on any map), they must still generate POIs on the recommended map based on known loot locations for those items
+- Each POI must explain **why** it is recommended. The loot expectation line must describe the player-relevant reason: needed items that spawn there (e.g., "High Salewa density · medical loot"), quest objectives at this location, or high-value loot for the active vibe. It must not simply list quest names.
 
 #### 🎯 Watchlist Scoring (Team-Aware)
 ```
@@ -204,31 +210,31 @@ When no intel exists for the recommended map (e.g., Boss Rush recommended Custom
 ## Requirements
 ### Functional
 - [x] Dashboard is the homepage (`/`) — first thing the player sees
-- [ ] Page renders inside the shared `PageHeader` with title "INTEL BRIEFING", subtitle "Next Raid Parameters Confirmed.", and `actions` slot containing **`LabeledSelector` ×2** (Vibe + Active Directive)
+- [x] Page renders inside the shared `PageHeader` with title "INTEL BRIEFING", subtitle "Next Raid Parameters Confirmed.", and `actions` slot containing **`LabeledSelector` ×2** (Vibe + Active Directive)
 - [x] Map Recommendation: map name, reasoning paragraph, quest objective count, raid duration in mono
-- [ ] `MapRecommendationCard` renders the variant assigned by the composition (`compact` or `hero`). Hero variant includes the "Optimal Pick" header pill and the **visual-only "Clear Map" button** (no behavior).
+- [x] `MapRecommendationCard` renders the variant assigned by the composition (`compact` or `hero`). Hero variant includes the "Optimal Pick" header pill and the **visual-only "Clear Map" button** (no behavior).
 - [x] **Team context in map recommendation**: teammate benefit badge (rendered in both variants)
 - [x] Loadout Suggestion: weapon class, armor class, rig, total budget estimate — rendered as categorized rows (Primary WPN / Ammo / Armor / Utility) with separators between
-- [ ] `LoadoutSuggestionCard` supports three variants (`compact`, `kit-categorized`, `kit-detailed`) per the UI Components table. `kit-detailed` includes the per-row icon tiles, sub-labels, header pill, and "EST. TOTAL COST" footer.
+- [x] `LoadoutSuggestionCard` supports three variants (`compact`, `kit-categorized`, `kit-detailed`) per the UI Components table. `kit-detailed` includes the per-row icon tiles, sub-labels, header pill, and "EST. TOTAL COST" footer.
 - [x] POI List: up to 5 cards with location name, loot expectation, **risk-colored dot indicator**, **risk pill badge**
-- [ ] `POIList` supports `detailed` and `compact` variants. Boss Rush uses `sortMode: 'boss-spawn-proximity'`.
+- [x] `POIList` supports `detailed` and `compact` variants. Boss Rush uses `sortMode: 'boss-spawn-proximity'`.
 - [x] Item Watchlist: up to 8 items with **icon tile (square 32px)** + name + mono source location
-- [ ] `ItemWatchlist` supports `hero` and `compact` variants. Hero variant accepts an optional goal-bound header pill ("PRESTIGE TARGETS" when active goal is Prestige, "ACTIVE QUESTS" otherwise).
+- [x] `ItemWatchlist` supports `hero` and `compact` variants. Hero variant accepts an optional goal-bound header pill ("PRESTIGE TARGETS" when active goal is Prestige, "ACTIVE QUESTS" otherwise).
 - [x] Threat Assessment: 3-tile card (Boss Probability / Goon Sighting / Danger Level) inside an error-tinted card border
-- [ ] `ThreatAssessmentCard` supports `format: 'tiles' \| 'rows' \| 'bars'` per the spec above; the format is set by the layout composition, not by the active vibe directly. The PvP `bars` format replaces the Danger Level tile with **PMC Frequency**.
-- [ ] **Goon Sighting**: consumes `useGoonReports().byMap(recommendedMapId)`. Shows "SIGHTED" with relative timestamp and POI when present; "CLEAR" when none; "STALE" when last sighting >30 min old. Behaviour is identical across all three Threat formats; only the visual containment changes.
-- [ ] **Vibe-specific intel cards**: exactly one of `QuickAnalysisCard` / `BossEncounterCard` / `CombatStrategyCard` renders, driven by `vibe.intelCard` (see spec-005). Each consumes `vibeIntelData` from `useRaidPlan()`.
-- [ ] `QuickAnalysisCard` (Loot Run) renders two horizontal meter rows: LOOT DENSITY (primary fill) + SURVIVAL PROB (destructive fill).
-- [ ] `BossEncounterCard` (Boss Rush) renders a 2-col grid: Spawn Points / Guard Status / Unique Loot bullets on the left, Tactical Approach + Flank Maneuvers paragraphs on the right. Content sourced from `lib/boss-intel.ts`.
-- [ ] `CombatStrategyCard` (PvP / Mixed) renders 2–3 named tactical-notes protocols (e.g., CQB Protocol, Anti-Goon Maneuver). Content sourced from `lib/combat-protocols.ts`.
-- [ ] When intel data is missing for the recommended map, the intel card renders a "Intel not yet available" empty state inside the same card frame — never `null`.
+- [x] `ThreatAssessmentCard` supports `format: 'tiles' | 'rows' | 'bars'` per the spec above; the format is set by the layout composition, not by the active vibe directly. The PvP `bars` format replaces the Danger Level tile with **PMC Frequency**.
+- [x] **Goon Sighting**: consumes `useGoonReports().byMap(recommendedMapId)`. Shows "SIGHTED" with relative timestamp and POI when present; "CLEAR" when none; "STALE" when last sighting >30 min old. Behaviour is identical across all three Threat formats; only the visual containment changes.
+- [x] **Vibe-specific intel cards**: exactly one of `QuickAnalysisCard` / `BossEncounterCard` / `CombatStrategyCard` renders, driven by `vibe.intelCard` (see spec-005). Each consumes `vibeIntelData` from `useRaidPlan()`.
+- [x] `QuickAnalysisCard` (Loot Run) renders two horizontal meter rows: LOOT DENSITY (primary fill) + SURVIVAL PROB (destructive fill).
+- [x] `BossEncounterCard` (Boss Rush) renders a 2-col grid: Spawn Points / Guard Status / Unique Loot bullets on the left, Tactical Approach + Flank Maneuvers paragraphs on the right. Content sourced from `lib/boss-intel.ts`.
+- [x] `CombatStrategyCard` (PvP / Mixed) renders 2–3 named tactical-notes protocols (e.g., CQB Protocol, Anti-Goon Maneuver). Content sourced from `lib/combat-protocols.ts`.
+- [x] When intel data is missing for the recommended map, the intel card renders a "Intel not yet available" empty state inside the same card frame — never `null`.
 - [x] **Team Impact section**: "This raid helps:" with per-teammate quest counts
 - [x] Refresh button re-fetches TarkovTracker state (player + team) and recomputes
 - [x] Dashboard recomputes when Vibe changes (no page reload — reactive via `useMemo`)
-- [ ] **Layout composition driven by the active vibe** — see Layout Composition table above. `lib/dashboard-layout.ts` is the single source of truth; `DashboardGrid` reads it and dispatches between `12col-with-secondary` and `2col-split` shapes.
-- [ ] Mobile collapse order: hero stack → secondary (if any) → sidebar stack — preserving the order defined in the composition entry. Cards keep their assigned variants on mobile (no automatic switch to `compact` on small screens).
+- [x] **Layout composition driven by the active vibe** — see Layout Composition table above. `lib/dashboard-layout.ts` is the single source of truth; `DashboardGrid` reads it and dispatches between `12col-with-secondary` and `2col-split` shapes.
+- [x] Mobile collapse order: hero stack → secondary (if any) → sidebar stack — preserving the order defined in the composition entry. Cards keep their assigned variants on mobile (no automatic switch to `compact` on small screens).
 - [x] When team data is unavailable, all team-specific indicators are hidden (no errors)
-- [ ] When goon reports unavailable (API down): Goon Sighting tile shows "—" with neutral styling, no error toast
+- [x] When goon reports unavailable (API down): Goon Sighting tile shows "—" with neutral styling, no error toast
 - [x] Not connected → shows "Connect your account" CTA linking to Settings
 - [x] No open tasks → shows "🎉 All caught up!" message
 - [ ] **Team indicators on POIs**: show teammate initials on POIs where they also have objectives (both `detailed` and `compact` variants)

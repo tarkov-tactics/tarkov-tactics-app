@@ -21,9 +21,11 @@ export const TASKS_QUERY = `
     tasks {
       id
       name
+      wikiLink
       trader { name }
       map { name }
       minPlayerLevel
+      experience
       kappaRequired
       taskRequirements { task { id name } }
       objectives {

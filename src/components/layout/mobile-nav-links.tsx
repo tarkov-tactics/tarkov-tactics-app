@@ -53,6 +53,7 @@ export function MobileNavLinks({ pathname }: { pathname: string }) {
           return (
             <SheetClose
               key={item.href}
+              nativeButton={false}
               render={
                 <Link
                   href={item.href}
@@ -79,6 +80,7 @@ export function MobileNavLinks({ pathname }: { pathname: string }) {
           return (
             <SheetClose
               key={item.href}
+              nativeButton={false}
               render={
                 <Link
                   href={item.href}

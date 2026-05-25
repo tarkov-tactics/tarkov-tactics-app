@@ -58,7 +58,7 @@ export default function GoalsPage() {
           </div>
 
           {/* Sidebar column: Scope filter + Progression Summary + Open Quests */}
-          <aside className="lg:col-span-4 flex flex-col gap-4 lg:gap-6 min-w-0">
+          <aside className="lg:col-span-4 flex flex-col gap-4 lg:gap-6 min-w-0 lg:sticky lg:top-20 lg:self-start">
             <DirectiveScopeFilter
               options={scopeOptions}
               value={directiveScope}
@@ -93,7 +93,14 @@ export default function GoalsPage() {
                   isActive={activeGoal === goal.id}
                   onSelect={() => setActiveGoal(goal.id)}
                   progress={
-                    p ? { completed: p.completed, total: p.total } : undefined
+                    p
+                      ? p.prestigeAxes
+                        ? (() => {
+                            const tracked = p.prestigeAxes.filter((a) => a.current !== null);
+                            return { completed: tracked.filter((a) => a.met).length, total: tracked.length };
+                          })()
+                        : { completed: p.completed, total: p.total }
+                      : undefined
                   }
                 />
               );

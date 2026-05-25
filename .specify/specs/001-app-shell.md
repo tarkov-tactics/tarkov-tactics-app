@@ -1,6 +1,6 @@
 # Feature Spec: App Shell & Navigation
 
-> Status: `in-progress` (stitch design adoption)
+> Status: `done`
 > Priority: `P0`
 > Feature: `shared`
 
@@ -34,41 +34,41 @@ The shell adopts the **Tarkov Tactical Interface (TTI)** visual language: the si
 | `OperatorIdentity` | `components/layout/operator-identity.tsx` | Client | Avatar + display name + "PMC LEVEL XX" telemetry label. Lives at the top of the sidebar. Falls back to "NOT CONNECTED" state when disconnected. |
 | `Header` | `components/layout/header.tsx` | Client | Sticky top bar. **Mobile**: menu trigger + branding + compact connection chip. **Desktop**: empty (sidebar carries identity + nav; the page's `PageHeader` carries the title). No global refresh button — manual refresh lives in Settings; data auto-refreshes on app load. |
 | `PageHeader` | `components/layout/page-header.tsx` | Server | Shared page chrome: tactical title (uppercase, tracking-tight, `text-2xl lg:text-3xl`) + optional subtitle pill (e.g., "DIRECTIVES") + sentence-case subtitle line + right-aligned `actions` slot. Used by every primary page. Renders inside the page's outer padding container; stacks vertically on mobile. |
-| `MobileNav` | `components/layout/mobile-nav.tsx` | Client | Sheet/drawer navigation for small screens |
+| `MobileNavLinks` | `components/layout/mobile-nav-links.tsx` | Client | Navigation links used inside the Header's mobile Sheet/drawer |
 
 ## Requirements
 ### Functional
 - [x] Sidebar displays primary nav items: **Dashboard, Directives (Goals), Team** (from `siteConfig.primaryNav`). Settings + Log Out are in the sidebar footer. Vibes was removed from primary nav — switching happens inline on the Dashboard (see spec-005).
 - [x] Active route is visually highlighted in sidebar
-- [ ] Sidebar **leads with `OperatorIdentity`** — avatar (placeholder for now), `displayName`, and `PMC LEVEL XX` telemetry label, separated by a 1px border from the nav list
-- [ ] `Settings` and `Log Out` live in a dedicated **sidebar footer block**, separated by a 1px border from the main nav (matches Stitch reference)
+- [x] Sidebar **leads with `OperatorIdentity`** — initials monogram + `displayName` + `PMC LEVEL XX` telemetry label, separated by a 1px border from the nav list
+- [x] `Settings` and `Log Out` live in a dedicated **sidebar footer block**, separated by a 1px border from the main nav (matches Stitch reference)
 - [x] Sidebar collapses to icons-only on medium screens (64px wide)
 - [x] Sidebar becomes a slide-out drawer on mobile (<768px)
-- [ ] Header de-emphasized on desktop — no duplicate branding, no player chip, **no refresh button**. The page's `PageHeader` provides identity. Desktop header is visually empty (sticky structure preserved for layout).
-- [ ] Mobile header carries: menu trigger, "TT" branding, compact connection chip (linked to Settings)
-- [ ] No global refresh control on any page header. Player + team data **auto-refresh on app load** via the provider mount effect (already implemented in `PlayerStateProvider` / `TeamStateProvider`). Manual refresh lives on the Settings page — see spec-002.
-- [ ] `PageHeader` component renders: uppercase tactical title (e.g., "INTEL BRIEFING"), optional subtitle pill (e.g., "DIRECTIVES" on the Goals page), telemetry subtitle line, and right-aligned `actions` slot for inline selectors / CTAs
-- [ ] **`PageHeader.actions` usage** per page:
+- [x] Header de-emphasized on desktop — hidden via `md:hidden`; the page's `PageHeader` provides identity.
+- [x] Mobile header carries: menu trigger, "TT" branding, compact connection chip (linked to Settings)
+- [x] No global refresh control on any page header. Player + team data **auto-refresh on app load** via the provider mount effect. Manual refresh lives on the Settings page — see spec-002.
+- [x] `PageHeader` component renders: uppercase tactical title, sentence-case subtitle line, and right-aligned `actions` slot for inline selectors / CTAs
+- [x] **`PageHeader.actions` usage** per page:
   - **Dashboard** (`/`): `LabeledSelector` ×2 → "SELECT VIBE" + "ACTIVE DIRECTIVE" (see spec-005 / spec-006).
   - **Directives** (`/goals`): single primary-styled `TarkovTrackerProfileLink` ("View Profile on TarkovTracker.org"). The `DirectiveScopeFilter` is rendered **inside** the right side column, not in the header (see spec-004).
   - **Team** (`/team`), **Settings** (`/settings`): no `actions` slot content.
 - [x] Content area fills remaining space and scrolls independently
-- [ ] App uses **Hanken Grotesk** as the primary UI font and **Geist** as the telemetry/mono font (via `next/font/google`)
-- [ ] Telemetry label utility class available globally (10px Geist, weight 600, uppercase, `tracking-widest`)
+- [x] App uses **Hanken Grotesk** as the primary UI font and **Geist Mono** as the telemetry/mono font (via `next/font/google`)
+- [x] Telemetry label utility class available globally (10px Geist Mono, weight 600, uppercase, `tracking-widest`)
 
 ### Non-Functional
 - [x] Responsive across mobile, tablet, desktop
 - [x] Smooth transition animations on sidebar collapse
-- [ ] Loading skeleton for `OperatorIdentity` while player state is fetching
+- [x] Loading skeleton for `OperatorIdentity` while player state is fetching
 
 ## Success Criteria
 - [x] All 5 routes are navigable from the sidebar (Dashboard, Goals/Directives, Vibes, Team, Settings)
 - [x] Active route is visually distinct
 - [x] Mobile drawer opens/closes cleanly
 - [x] Build passes with no TypeScript errors
-- [ ] Sidebar matches Stitch reference: identity block → nav → settings/logout footer
-- [ ] Every page renders inside a `PageHeader` lockup matching the Stitch typographic style
-- [ ] No remaining references to Red Hat Text in code or fonts (Hanken Grotesk only)
+- [x] Sidebar matches Stitch reference: identity block → nav → settings/logout footer
+- [x] Every page renders inside a `PageHeader` lockup
+- [x] No remaining references to Red Hat Text in code or fonts (Hanken Grotesk only)
 
 ## Edge Cases
 - No TarkovTracker token → `OperatorIdentity` shows "OPERATOR — / NOT CONNECTED" with link to Settings

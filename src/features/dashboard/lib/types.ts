@@ -50,6 +50,12 @@ export interface PrioritizedPOI {
   lootExpectation: string;
   keyRequired?: string;
   riskLevel: 'low' | 'medium' | 'high';
+  /** Items the player needs that can be found at this POI */
+  neededItems?: string[];
+  /** Loot categories available at this POI */
+  lootCategories?: string[];
+  /** Quest objectives at this location */
+  questObjectives?: string[];
 }
 
 export interface WatchlistItem {

@@ -1,6 +1,6 @@
 # Feature Spec: Vibe Selection
 
-> Status: `in-progress` (inline selector only — standalone page removed)
+> Status: `done`
 > Priority: `P0`
 > Feature: `vibes`
 
@@ -85,8 +85,8 @@ Let the player pick their current "Vibe" — their short-term raid intent. The v
 - [x] Switching vibe triggers Dashboard recalculation (via shared state/context)
 - [x] `useVibeConfig()` hook provides `activeVibe` and `vibeModifier` to any component
 - [x] No dedicated `/vibes` route — removed
-- [ ] **`VibeDefinition.intelCard`** — every vibe definition in `features/vibes/types.ts` declares exactly one `intelCard` value. The dashboard's `useRaidPlan()` reads this to compute `vibeIntelData` and the layout composition map (spec-006) reads it to slot the right intel card.
-- [ ] **Team impact** — when team data is available, the engine still weights vibe-specific map preferences against teammate overlap. The user doesn't see a "team impact" indicator on the Vibe selector itself (no room in the trigger). Team benefit shows up in the dashboard cards (`teamImpact` badge on Map Recommendation, Team Impact panel). When team data is unavailable, those indicators are hidden — no errors.
+- [x] **`VibeDefinition.intelCard`** — every vibe definition in `features/vibes/types.ts` declares exactly one `intelCard` value. The dashboard's `useRaidPlan()` reads this to compute `vibeIntelData` and the layout composition map (spec-006) reads it to slot the right intel card.
+- [x] **Team impact** — when team data is available, the engine weights vibe-specific map preferences against teammate overlap. The user doesn't see a "team impact" indicator on the Vibe selector itself (no room in the trigger). Team benefit shows up in the dashboard cards (`teamImpact` badge on Map Recommendation, Team Impact panel). When team data is unavailable, those indicators are hidden — no errors.
 
 ### Non-Functional
 - [ ] Vibe switch should feel instant (no loading spinner)

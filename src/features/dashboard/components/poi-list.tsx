@@ -114,6 +114,18 @@ export function POIList({
                     {style.label}
                   </span>
                 </div>
+                {poi.neededItems && poi.neededItems.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pl-4">
+                    {poi.neededItems.map((item) => (
+                      <span
+                        key={item}
+                        className="rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-mono tracking-wider text-primary"
+                      >
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground pl-4">
                   {poi.lootExpectation}
                 </p>

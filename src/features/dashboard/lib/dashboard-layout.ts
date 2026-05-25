@@ -7,7 +7,7 @@ import type { VibeModifier } from "@/features/vibes/types";
 
 export type DashboardShape = "12col-with-secondary" | "2col-split";
 
-export type CardVariant = "hero" | "compact" | "kit-detailed";
+export type CardVariant = "hero" | "compact" | "kit-detailed" | "kit-categorized";
 export type ThreatFormat = "tiles" | "rows" | "bars";
 export type POISortMode = "priority" | "boss-spawn-proximity";
 
@@ -76,7 +76,7 @@ const BOSS_LAYOUT: DashboardComposition = {
   sidebar: [
     { key: "map", variant: "compact" },
     { key: "watchlist", variant: "compact" },
-    { key: "loadout", variant: "compact" },
+    { key: "loadout", variant: "kit-categorized" },
   ],
 };
 

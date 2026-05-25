@@ -77,6 +77,7 @@ Never implement something that isn't described in the relevant spec. If a spec i
 - ESLint enforced, conventional commits
 - Named exports preferred (except page components)
 - Base UI Button: use `nativeButton={false}` when rendering as `<Link>` or `<a>`
+- **localStorage hydration**: never read `localStorage` inside `useState` initializers — it runs on the server (where `window` is undefined) and produces values that mismatch the client, causing hydration errors. Always initialize with a static default and sync from `localStorage` in a `useEffect`.
 
 ## Design System — Tarkov Tactical Interface (TTI)
 
