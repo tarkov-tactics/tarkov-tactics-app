@@ -9,6 +9,7 @@ import { useTeamState, getSharedOpenTasks } from "@/hooks/use-team-state";
 import { TeammateCard } from "@/features/team/components/teammate-card";
 import { TeamPermissionPrompt } from "@/features/team/components/team-permission-prompt";
 import { PageHeader } from "@/components/layout/page-header";
+import { getActionableTaskIds, getTeammateOpenTaskIds } from "@/lib/derived-progress";
 
 export default function TeamPage() {
   const { isConnected, progress } = usePlayerState();
@@ -24,23 +25,7 @@ export default function TeamPage() {
 
   const playerOpenTaskIds = useMemo(() => {
     if (!progress) return new Set<string>();
-    const completedIds = new Set(
-      progress.tasksProgress.filter((t) => t.complete).map((t) => t.id)
-    );
-    const failedIds = new Set(
-      progress.tasksProgress.filter((t) => t.failed).map((t) => t.id)
-    );
-    const actionable = new Set<string>();
-    for (const task of gameTasks) {
-      if (completedIds.has(task.id) || failedIds.has(task.id)) continue;
-      if ((task.minPlayerLevel ?? 0) > progress.playerLevel) continue;
-      if (task.trader.name === 'Fence') continue;
-      const prereqsMet = (task.taskRequirements ?? []).every(
-        (req) => completedIds.has(req.task.id)
-      );
-      if (prereqsMet) actionable.add(task.id);
-    }
-    return actionable;
+    return getActionableTaskIds(progress, gameTasks);
   }, [progress, gameTasks]);
 
   const sharedTasks = progress
@@ -48,11 +33,7 @@ export default function TeamPage() {
     : new Map<string, string[]>();
 
   function getSharedCountFor(teammate: typeof teammates[0]) {
-    const teammateOpen = new Set(
-      teammate.tasksProgress
-        .filter((t) => !t.complete && !t.failed)
-        .map((t) => t.id)
-    );
+    const teammateOpen = getTeammateOpenTaskIds(teammate);
     let count = 0;
     for (const taskId of playerOpenTaskIds) {
       if (teammateOpen.has(taskId)) count++;

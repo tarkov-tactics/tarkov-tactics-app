@@ -129,6 +129,17 @@ The page adopts the Stitch **Directives Overview** layout: a hero **Active Direc
 |------|----------|-------------|
 | `useGoalState()` | `features/goals/hooks/use-goal-progress.ts` | Active goal selection (localStorage), per-goal progress computation by cross-referencing `useGameData()` tasks + `usePlayerState()` completion. Returns `allGoalProgress` (Map), `activeGoalProgress`, `gameDataLoaded`, `prestigeTarget`, `setPrestigeTarget`, `directiveScope`, `setDirectiveScope`, `scopeOptions` (the list of scopes valid for the current goal), `scopedProgress` (active-goal progress further filtered by the current scope — sub-category counts powering `ProgressionSummary` and the scoped task lists). |
 
+### Centralized Task Filtering (`src/lib/derived-progress.ts`)
+
+All task filtering uses a single canonical definition of "actionable task" via `getActionableTaskIds()` from `src/lib/derived-progress.ts`. A task is actionable when:
+- Not completed
+- Not failed
+- Not a Fence trader quest
+- Player level meets `minPlayerLevel`
+- All prerequisite tasks are completed
+
+This definition is shared across Goals, Dashboard, and Team pages to ensure consistent progress counts. The same module provides `deriveProgressSets()` (completedTaskIds, failedTaskIds, completedModuleIds) and `getTeammateOpenTaskIds()` to eliminate duplicated set construction.
+
 ### Per-Goal Task Filtering (in `use-goal-progress.ts`)
 - **Kappa**: `tasks.filter(t => t.kappaRequired !== false)` — all required tasks
 - **Lightkeeper**: tasks where `trader.name === 'Lightkeeper'`

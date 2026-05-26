@@ -11,6 +11,7 @@ import {
 } from "react";
 import type { ProgressData } from "@/lib/api/tarkov-tracker/types";
 import { usePlayerState } from "./use-player-state";
+import { getTeammateOpenTaskIds } from "@/lib/derived-progress";
 
 // ── Storage helpers (same key as player state) ────────────────────
 const TOKEN_KEY = "tarkov-tracker-token";
@@ -158,11 +159,7 @@ export function getSharedOpenTasks(
   const shared = new Map<string, string[]>();
 
   for (const teammate of teammates) {
-    const teammateOpen = new Set(
-      teammate.tasksProgress
-        .filter((t) => !t.complete && !t.failed)
-        .map((t) => t.id)
-    );
+    const teammateOpen = getTeammateOpenTaskIds(teammate);
 
     for (const taskId of playerTaskIds) {
       if (teammateOpen.has(taskId)) {
@@ -188,11 +185,7 @@ export function getTeamTaskOverlap(
 
   let overlap = 0;
   for (const teammate of teammates) {
-    const teammateOpen = new Set(
-      teammate.tasksProgress
-        .filter((t) => !t.complete && !t.failed)
-        .map((t) => t.id)
-    );
+    const teammateOpen = getTeammateOpenTaskIds(teammate);
 
     for (const taskId of mapTaskIds) {
       if (playerOpenTaskIds.has(taskId) && teammateOpen.has(taskId)) {

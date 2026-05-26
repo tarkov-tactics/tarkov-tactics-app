@@ -12,33 +12,17 @@ import type { TarkovTask, TarkovMap, HideoutStation } from '@/lib/api/tarkov-dev
 import type { VibeModifier } from '@/features/vibes/types';
 import { getBossIntel } from './boss-intel';
 import { getCombatProtocols } from './combat-protocols';
-
-// ── Actionable Task Filter ─────────────────────────────────────────
-
-function getActionableTaskIds(
-  progress: ProgressData,
-  tasks: TarkovTask[],
-): Set<string> {
-  const completedIds = new Set(
-    progress.tasksProgress.filter((t) => t.complete).map((t) => t.id)
-  );
-  const failedIds = new Set(
-    progress.tasksProgress.filter((t) => t.failed).map((t) => t.id)
-  );
-
-  const actionable = new Set<string>();
-  for (const task of tasks) {
-    if (completedIds.has(task.id) || failedIds.has(task.id)) continue;
-    if ((task.minPlayerLevel ?? 0) > progress.playerLevel) continue;
-    if (task.trader.name === 'Fence') continue;
-
-    const prereqsMet = (task.taskRequirements ?? []).every(
-      (req) => completedIds.has(req.task.id)
-    );
-    if (prereqsMet) actionable.add(task.id);
-  }
-  return actionable;
-}
+import {
+  deriveProgressSets,
+  getActionableTaskIds,
+  getTeammateOpenTaskIds,
+  getNextIncompleteLevels,
+  getTopBoss,
+  getTopBossSpawnChance,
+  getTotalBossChance,
+  type DerivedProgressSets,
+} from '@/lib/derived-progress';
+import { getPvpDensity } from '@/lib/constants';
 
 // ── Early-Game Progression Bonus ──────────────────────────────────
 
@@ -77,7 +61,7 @@ function scoreMap(
   tasks: TarkovTask[],
   vibeModifier: VibeModifier,
   maps: TarkovMap[],
-  teammates: ProgressData[],
+  teammateOpenSets: { data: ProgressData; openTaskIds: Set<string> }[],
   playerLevel: number,
 ): MapScore {
   let questCount = 0;
@@ -101,8 +85,7 @@ function scoreMap(
   const mapData = maps.find((m) => m.name === mapName);
   let vibeMultiplier = 1.0;
   if (vibeModifier.poiPriority === 'boss') {
-    const totalBossChance = (mapData?.bosses ?? []).reduce((s, b) => s + b.spawnChance, 0);
-    vibeMultiplier = 1.0 + totalBossChance;
+    vibeMultiplier = 1.0 + getTotalBossChance(mapData?.bosses ?? []);
   } else if (vibeModifier.poiPriority === 'loot') {
     vibeMultiplier = vibeModifier.riskTolerance === 'low' ? 1.2 : 0.8;
   }
@@ -116,13 +99,10 @@ function scoreMap(
 
   // Team overlap bonus
   let teamOverlap = 0;
-  for (const teammate of teammates) {
-    const teammateOpen = new Set(
-      teammate.tasksProgress.filter((t) => !t.complete && !t.failed).map((t) => t.id)
-    );
+  for (const { openTaskIds } of teammateOpenSets) {
     for (const task of tasks) {
       if (!playerOpenTaskIds.has(task.id)) continue;
-      if (!teammateOpen.has(task.id)) continue;
+      if (!openTaskIds.has(task.id)) continue;
       const onMap = task.map?.name === mapName ||
         task.objectives.some((o) => o.maps.some((m) => m.name === mapName));
       if (onMap) teamOverlap++;
@@ -320,28 +300,18 @@ interface HideoutNeed {
 }
 
 function getHideoutNeeds(
-  progress: ProgressData,
+  completedModuleIds: Set<string>,
   hideoutStations: HideoutStation[],
 ): HideoutNeed[] {
-  const completedModuleIds = new Set(
-    progress.hideoutModulesProgress.filter((m) => m.complete).map((m) => m.id)
-  );
+  const nextLevels = getNextIncompleteLevels(completedModuleIds, hideoutStations);
   const needs: HideoutNeed[] = [];
-
-  for (const station of hideoutStations) {
-    const sortedLevels = [...station.levels].sort((a, b) => a.level - b.level);
-    for (const lvl of sortedLevels) {
-      const moduleId = `${station.id}-${lvl.level}`;
-      if (completedModuleIds.has(moduleId) || completedModuleIds.has(station.id)) continue;
-
-      for (const req of lvl.itemRequirements) {
-        needs.push({
-          itemName: req.item.name,
-          stationLabel: `${station.name} Lv${lvl.level}`,
-          categories: matchHideoutItemToCategories(req.item.name),
-        });
-      }
-      break;
+  for (const lvl of nextLevels) {
+    for (const req of lvl.itemRequirements) {
+      needs.push({
+        itemName: req.item.name,
+        stationLabel: lvl.label,
+        categories: matchHideoutItemToCategories(req.item.name),
+      });
     }
   }
   return needs;
@@ -353,7 +323,7 @@ function rankPOIs(
   playerOpenTaskIds: Set<string>,
   vibeModifier: VibeModifier,
   maps: TarkovMap[],
-  progress: ProgressData,
+  completedModuleIds: Set<string>,
   hideoutStations: HideoutStation[],
 ): PrioritizedPOI[] {
   const mapData = maps.find((m) => m.name === mapName);
@@ -402,7 +372,7 @@ function rankPOIs(
   }
 
   // Hideout-driven needs — boost POIs that spawn items needed for hideout upgrades
-  const hideoutNeeds = getHideoutNeeds(progress, hideoutStations);
+  const hideoutNeeds = getHideoutNeeds(completedModuleIds, hideoutStations);
   for (const need of hideoutNeeds) {
     for (const cat of need.categories) neededCategories.add(cat);
 
@@ -465,7 +435,7 @@ function buildWatchlist(
   tasks: TarkovTask[],
   playerOpenTaskIds: Set<string>,
   vibeModifier: VibeModifier,
-  progress: ProgressData,
+  completedModuleIds: Set<string>,
   hideoutStations: HideoutStation[],
 ): WatchlistItem[] {
   const seen = new Map<string, WatchlistItem>();
@@ -501,30 +471,19 @@ function buildWatchlist(
   }
 
   // Hideout items — find the next incomplete level per station and add its required items
-  const completedModuleIds = new Set(
-    progress.hideoutModulesProgress.filter((m) => m.complete).map((m) => m.id)
-  );
+  const nextLevels = getNextIncompleteLevels(completedModuleIds, hideoutStations);
+  for (const lvl of nextLevels) {
+    for (const req of lvl.itemRequirements) {
+      const normalizedKey = req.item.name.toLowerCase();
+      if (seen.has(normalizedKey)) continue;
 
-  for (const station of hideoutStations) {
-    const sortedLevels = [...station.levels].sort((a, b) => a.level - b.level);
-    for (const lvl of sortedLevels) {
-      const moduleId = `${station.id}-${lvl.level}`;
-      if (completedModuleIds.has(moduleId) || completedModuleIds.has(station.id)) continue;
-
-      for (const req of lvl.itemRequirements) {
-        const normalizedKey = req.item.name.toLowerCase();
-        if (seen.has(normalizedKey)) continue;
-
-        const label = `${station.name} Lv${lvl.level}`;
-        seen.set(normalizedKey, {
-          itemId: req.item.id,
-          itemName: req.item.name,
-          priorityScore: vibeModifier.poiPriority === 'loot' ? 1.5 : 0.8,
-          reason: `Hideout: ${label} (×${req.count})`,
-          fir: false,
-        });
-      }
-      break; // only the next incomplete level per station
+      seen.set(normalizedKey, {
+        itemId: req.item.id,
+        itemName: req.item.name,
+        priorityScore: vibeModifier.poiPriority === 'loot' ? 1.5 : 0.8,
+        reason: `Hideout: ${lvl.label} (×${req.count})`,
+        fir: false,
+      });
     }
   }
 
@@ -552,15 +511,9 @@ function assessRisks(mapName: string, maps: TarkovMap[]): RiskIndicator[] {
   }
 
   // PvP density heuristic
-  const highPvpMaps = ['Customs', 'Factory', 'Interchange', 'Reserve'];
-  const medPvpMaps = ['Shoreline', 'Streets of Tarkov'];
-  if (highPvpMaps.includes(mapName)) {
-    risks.push({ type: 'pmc', description: 'High PMC density', severity: 'high' });
-  } else if (medPvpMaps.includes(mapName)) {
-    risks.push({ type: 'pmc', description: 'Medium PMC density', severity: 'medium' });
-  } else {
-    risks.push({ type: 'pmc', description: 'Low PMC density', severity: 'low' });
-  }
+  const pvp = getPvpDensity(mapName);
+  const pvpLabel = pvp === 'high' ? 'High' : pvp === 'medium' ? 'Medium' : 'Low';
+  risks.push({ type: 'pmc', description: `${pvpLabel} PMC density`, severity: pvp });
 
   return risks;
 }
@@ -589,10 +542,7 @@ function computeVibeIntelData(
     }
     case 'boss-encounter': {
       const mapData = maps.find((m) => m.name === mapName);
-      const topBoss = mapData?.bosses.reduce<{ name: string; spawnChance: number } | null>(
-        (best, b) => (!best || b.spawnChance > best.spawnChance ? b : best),
-        null
-      );
+      const topBoss = getTopBoss(mapData?.bosses ?? []);
       const bossName = topBoss?.name ?? null;
       const intel = bossName ? getBossIntel(mapName, bossName) : null;
       return { kind: 'boss-encounter', bossName, mapName, intel };
@@ -627,14 +577,20 @@ export function computeRaidPlan(
   teammates: ProgressData[],
   hasGoonSighting = false,
   hideoutStations: HideoutStation[] = [],
+  derivedSets?: DerivedProgressSets,
 ): RaidPlanResult {
-  const playerOpenTaskIds = getActionableTaskIds(progress, tasks);
+  const sets = derivedSets ?? deriveProgressSets(progress);
+  const playerOpenTaskIds = getActionableTaskIds(progress, tasks, sets);
+  const teammateOpenSets = teammates.map((t) => ({
+    data: t,
+    openTaskIds: getTeammateOpenTaskIds(t),
+  }));
 
   // Score all maps
   const uniqueMapNames = [...new Set(maps.map((m) => m.name))];
   const mapScores = uniqueMapNames
     .map((name) =>
-      scoreMap(name, playerOpenTaskIds, tasks, vibeModifier, maps, teammates, progress.playerLevel)
+      scoreMap(name, playerOpenTaskIds, tasks, vibeModifier, maps, teammateOpenSets, progress.playerLevel)
     )
     .filter((s) => s.score > 0)
     .sort((a, b) => b.score - a.score);
@@ -656,14 +612,11 @@ export function computeRaidPlan(
   };
 
   const loadout = computeLoadout(progress.playerLevel, vibeModifier);
-  const pois = rankPOIs(bestMap.mapName, tasks, playerOpenTaskIds, vibeModifier, maps, progress, hideoutStations);
-  const watchlist = buildWatchlist(tasks, playerOpenTaskIds, vibeModifier, progress, hideoutStations);
+  const pois = rankPOIs(bestMap.mapName, tasks, playerOpenTaskIds, vibeModifier, maps, sets.completedModuleIds, hideoutStations);
+  const watchlist = buildWatchlist(tasks, playerOpenTaskIds, vibeModifier, sets.completedModuleIds, hideoutStations);
   const risks = assessRisks(bestMap.mapName, maps);
 
-  const topBossSpawnChance = (bestMapData?.bosses ?? []).reduce(
-    (max, b) => Math.max(max, b.spawnChance),
-    0
-  );
+  const topBossSpawnChance = getTopBossSpawnChance(bestMapData?.bosses ?? []);
   const vibeIntelData = computeVibeIntelData(
     vibeModifier,
     bestMap.mapName,
@@ -675,13 +628,10 @@ export function computeRaidPlan(
 
   // Team impact
   const teamImpact: TeamImpact[] = [];
-  for (const teammate of teammates) {
-    const tmOpen = new Set(
-      teammate.tasksProgress.filter((t) => !t.complete && !t.failed).map((t) => t.id)
-    );
+  for (const { data: teammate, openTaskIds } of teammateOpenSets) {
     let count = 0;
     for (const task of tasks) {
-      if (!tmOpen.has(task.id)) continue;
+      if (!openTaskIds.has(task.id)) continue;
       const onMap = task.map?.name === bestMap.mapName ||
         task.objectives.some((o) => o.maps.some((m) => m.name === bestMap.mapName));
       if (onMap) count++;

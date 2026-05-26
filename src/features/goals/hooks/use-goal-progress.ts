@@ -6,6 +6,7 @@ import { usePlayerState } from '@/hooks/use-player-state';
 import { useGameData } from '@/hooks/use-game-data';
 import type { TarkovTask, HideoutStation } from '@/lib/api/tarkov-dev/types';
 import type { ProgressData } from '@/lib/api/tarkov-tracker/types';
+import { deriveProgressSets, getCompletedHideoutLevel, type DerivedProgressSets } from '@/lib/derived-progress';
 import {
   PRESTIGE_TIERS,
   DEFAULT_PRESTIGE_TARGET,
@@ -151,6 +152,7 @@ function computePrestigeAxes(
   progress: ProgressData | null,
   questProgress: GoalProgress,
   hideoutStations: HideoutStation[],
+  sets: DerivedProgressSets | null,
 ): PrestigeAxis[] {
   const tier = PRESTIGE_TIERS[prestigeTarget];
   if (!tier) return [];
@@ -177,20 +179,10 @@ function computePrestigeAxes(
   });
 
   // Hideout module axes
-  const completedModuleIds = new Set(
-    progress?.hideoutModulesProgress.filter((m) => m.complete).map((m) => m.id) ?? []
-  );
+  const completedModuleIds = sets?.completedModuleIds ?? new Set<string>();
   for (const req of tier.hideoutRequirements) {
     const station = hideoutStations.find((s) => s.name === req.stationName);
-    let currentLevel = 0;
-    if (station) {
-      for (const lvl of station.levels) {
-        const moduleId = `${station.id}-${lvl.level}`;
-        if (completedModuleIds.has(moduleId) || completedModuleIds.has(station.id)) {
-          currentLevel = Math.max(currentLevel, lvl.level);
-        }
-      }
-    }
+    const currentLevel = station ? getCompletedHideoutLevel(station, completedModuleIds) : 0;
     axes.push({
       key: `hideout-${req.stationName}`,
       label: `${req.stationName} Lv${req.level}`,
@@ -229,13 +221,14 @@ function computeGoalProgress(
   progress: ProgressData | null,
   prestigeTarget: PrestigeTarget,
   hideoutStations: HideoutStation[],
+  sets: DerivedProgressSets | null,
 ): GoalProgress {
   const goalTasks = getGoalTasks(goalId, allTasks, progress, prestigeTarget);
-  const questProgress = computeProgressForTasks(goalTasks, progress);
+  const questProgress = computeProgressForTasks(goalTasks, progress, sets);
 
   if (goalId !== 'prestige') return questProgress;
 
-  const axes = computePrestigeAxes(prestigeTarget, progress, questProgress, hideoutStations);
+  const axes = computePrestigeAxes(prestigeTarget, progress, questProgress, hideoutStations, sets);
   const tracked = axes.filter((a) => a.current !== null);
   const trackedMet = tracked.filter((a) => a.met).length;
   const percentage = tracked.length > 0 ? Math.round((trackedMet / tracked.length) * 100) : 0;
@@ -247,16 +240,13 @@ function computeGoalProgress(
   };
 
   const tier = PRESTIGE_TIERS[prestigeTarget];
-  if (tier && !tier.requiresCollector && progress) {
-    const completedIds = new Set(
-      progress.tasksProgress.filter((t) => t.complete).map((t) => t.id)
-    );
+  if (tier && !tier.requiresCollector && progress && sets) {
     const playerLevel = progress.playerLevel ?? 0;
     result.xpRecommendedTasks = allTasks
       .filter((t) => t.kappaRequired !== false)
-      .filter((t) => !completedIds.has(t.id))
+      .filter((t) => !sets.completedTaskIds.has(t.id) && !sets.failedTaskIds.has(t.id))
       .filter((t) => (t.minPlayerLevel ?? 0) <= playerLevel)
-      .filter((t) => (t.taskRequirements ?? []).every((r) => completedIds.has(r.task.id)))
+      .filter((t) => (t.taskRequirements ?? []).every((r) => sets.completedTaskIds.has(r.task.id)))
       .sort((a, b) => (b.experience ?? 0) - (a.experience ?? 0));
   }
 
@@ -266,6 +256,7 @@ function computeGoalProgress(
 function computeProgressForTasks(
   goalTasks: TarkovTask[],
   progress: ProgressData | null,
+  sets?: DerivedProgressSets | null,
 ): GoalProgress {
   const total = goalTasks.length;
 
@@ -273,18 +264,17 @@ function computeProgressForTasks(
     return { total, completed: 0, percentage: 0, openTasks: goalTasks, completedTasks: [] };
   }
 
-  const completedIds = new Set(
-    progress.tasksProgress.filter((t) => t.complete).map((t) => t.id)
-  );
+  const { completedTaskIds, failedTaskIds } = sets ?? deriveProgressSets(progress);
 
-  const completedTasks = goalTasks.filter((t) => completedIds.has(t.id));
+  const completedTasks = goalTasks.filter((t) => completedTaskIds.has(t.id));
   const completed = completedTasks.length;
 
   const openTasks = goalTasks
-    .filter((t) => !completedIds.has(t.id))
+    .filter((t) => !completedTaskIds.has(t.id) && !failedTaskIds.has(t.id))
+    .filter((t) => t.trader.name !== 'Fence')
     .filter((t) => {
       if ((t.minPlayerLevel ?? 0) > progress.playerLevel) return false;
-      return (t.taskRequirements ?? []).every((req) => completedIds.has(req.task.id));
+      return (t.taskRequirements ?? []).every((req) => completedTaskIds.has(req.task.id));
     });
 
   return {
@@ -322,6 +312,11 @@ export function useGoalState() {
   const { progress } = usePlayerState();
   const { tasks: gameTasks, hideoutStations, dataLoaded } = useGameData();
 
+  const derivedSets = useMemo(
+    () => progress ? deriveProgressSets(progress) : null,
+    [progress]
+  );
+
   const setActiveGoal = useCallback((id: GoalId) => {
     setActiveGoalState(id);
     try { localStorage.setItem(STORAGE_KEY, id); } catch { /* noop */ }
@@ -345,10 +340,10 @@ export function useGoalState() {
     if (!dataLoaded || gameTasks.length === 0) return null;
     const map = new Map<GoalId, GoalProgress>();
     for (const goal of GOALS) {
-      map.set(goal.id, computeGoalProgress(goal.id, gameTasks, progress, prestigeTarget, hideoutStations));
+      map.set(goal.id, computeGoalProgress(goal.id, gameTasks, progress, prestigeTarget, hideoutStations, derivedSets));
     }
     return map;
-  }, [gameTasks, dataLoaded, progress, prestigeTarget, hideoutStations]);
+  }, [gameTasks, dataLoaded, progress, prestigeTarget, hideoutStations, derivedSets]);
 
   const activeGoalProgress = activeGoal && allGoalProgress
     ? allGoalProgress.get(activeGoal) ?? null
@@ -363,7 +358,7 @@ export function useGoalState() {
     if (directiveScope === ALL_SCOPE.id) return activeGoalProgress;
     const filteredOpen = filterTasksByScope(activeGoal, directiveScope, activeGoalProgress.openTasks);
     const filteredDone = filterTasksByScope(activeGoal, directiveScope, activeGoalProgress.completedTasks);
-    const scoped = computeProgressForTasks([...filteredOpen, ...filteredDone], progress);
+    const scoped = computeProgressForTasks([...filteredOpen, ...filteredDone], progress, derivedSets);
     if (activeGoalProgress.prestigeAxes) {
       scoped.prestigeAxes = activeGoalProgress.prestigeAxes;
       scoped.percentage = activeGoalProgress.percentage;
@@ -374,7 +369,7 @@ export function useGoalState() {
         : filterTasksByScope(activeGoal, directiveScope, activeGoalProgress.xpRecommendedTasks);
     }
     return scoped;
-  }, [activeGoal, directiveScope, activeGoalProgress, progress]);
+  }, [activeGoal, directiveScope, activeGoalProgress, progress, derivedSets]);
 
   return {
     activeGoal,

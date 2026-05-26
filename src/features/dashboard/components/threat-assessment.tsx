@@ -5,6 +5,8 @@ import { cn, formatRelativeTime } from "@/lib/utils";
 import { useGameData } from "@/hooks/use-game-data";
 import { useGoonReports } from "@/hooks/use-goon-reports";
 import type { MapRecommendation } from "../lib/types";
+import { getTopBoss } from "@/lib/derived-progress";
+import { STALE_GOON_REPORT_MS, getPvpDensity, PVP_HOTSPOTS } from "@/lib/constants";
 
 interface ThreatAssessmentCardProps {
   map: MapRecommendation;
@@ -30,8 +32,6 @@ function bossLabel(tier: ThreatTier): string {
   return tier === "extreme" ? "EXTREME" : tier === "elevated" ? "ELEVATED" : "LOW";
 }
 
-const STALE_REPORT_MS = 30 * 60 * 1000;
-
 // ── Shared threat-state hook ─────────────────────────────────────
 
 interface ThreatState {
@@ -45,37 +45,14 @@ interface ThreatState {
   pvpDensity: { label: string; pct: number; hotspots: string };
 }
 
-const HIGH_PVP = new Set(["Customs", "Factory", "Interchange", "Reserve"]);
-const MED_PVP = new Set(["Shoreline", "Streets of Tarkov"]);
-
-const PVP_HOTSPOTS: Record<string, string> = {
-  Customs: "Dorms, Crackhouse",
-  Factory: "Office, Gates",
-  Interchange: "Mall, Power",
-  Reserve: "Train, RB",
-  "Streets of Tarkov": "Concordia, Pinewood",
-  Shoreline: "Resort, Pier",
-};
-
-function usePvpDensity(mapName: string) {
-  if (HIGH_PVP.has(mapName)) {
-    return { label: "High", pct: 85, hotspots: PVP_HOTSPOTS[mapName] ?? "" };
-  }
-  if (MED_PVP.has(mapName)) {
-    return { label: "Medium", pct: 55, hotspots: PVP_HOTSPOTS[mapName] ?? "" };
-  }
-  return { label: "Low", pct: 25, hotspots: PVP_HOTSPOTS[mapName] ?? "" };
-}
+const PVP_PCT: Record<string, number> = { high: 85, medium: 55, low: 25 };
 
 function useThreatState(map: MapRecommendation): ThreatState {
   const { maps } = useGameData();
   const { byMap } = useGoonReports();
   const mapData = maps.find((m) => m.id === map.mapId);
 
-  const topBoss = mapData?.bosses.reduce<{ name: string; spawnChance: number } | null>(
-    (best, b) => (!best || b.spawnChance > best.spawnChance ? b : best),
-    null
-  ) ?? null;
+  const topBoss = getTopBoss(mapData?.bosses ?? []);
   const bossChance = topBoss?.spawnChance ?? 0;
   const bossPct = Math.round(bossChance * 100);
 
@@ -91,13 +68,15 @@ function useThreatState(map: MapRecommendation): ThreatState {
   let goonText: string | null = null;
   if (goonReport) {
     const ageMs = now - Date.parse(goonReport.timestamp);
-    goonState = ageMs > STALE_REPORT_MS ? "stale" : "sighted";
+    goonState = ageMs > STALE_GOON_REPORT_MS ? "stale" : "sighted";
     goonText = `${map.mapName} · ${formatRelativeTime(new Date(goonReport.timestamp))}`;
   }
 
   const tier = dangerTier(bossChance, goonState === "sighted");
   const tierFill = tier === "extreme" ? 4 : tier === "elevated" ? 2 : 1;
-  const pvpDensity = usePvpDensity(map.mapName);
+  const pvp = getPvpDensity(map.mapName);
+  const pvpLabel = pvp === "high" ? "High" : pvp === "medium" ? "Medium" : "Low";
+  const pvpDensity = { label: pvpLabel, pct: PVP_PCT[pvp], hotspots: PVP_HOTSPOTS[map.mapName] ?? "" };
 
   return { topBoss, bossChance, bossPct, goonState, goonText, tier, tierFill, pvpDensity };
 }
