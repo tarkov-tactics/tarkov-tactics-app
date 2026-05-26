@@ -81,6 +81,7 @@ poiScore = questObjectiveWeight
 - Show top 3-5 POIs with expected loot and key requirements
 - When quest objectives have no map restriction (e.g., "Find Salewas in raid" can be done on any map), they must still generate POIs on the recommended map based on known loot locations for those items
 - Each POI must explain **why** it is recommended. The loot expectation line must describe the player-relevant reason: needed items that spawn there (e.g., "High Salewa density · medical loot"), quest objectives at this location, or high-value loot for the active vibe. It must not simply list quest names.
+- **Per-item pill tooltips**: each item in `PrioritizedPOI.neededItems` carries `{ name, reason, wikiLink? }`. The pill label shows the canonical item name (with `- FIR` suffix when found-in-raid is required). Hovering a pill shows the `reason` (e.g., "Therapist: Shortage") as a tooltip; when `wikiLink` is present, the tooltip text is a clickable link to the Tarkov wiki. Pills render as `<span>` elements for text selectability. When no item pills exist, the `lootExpectation` subtitle is shown instead.
 
 #### 🎯 Watchlist Scoring (Team-Aware)
 ```
@@ -90,6 +91,12 @@ itemPriority = goalNeedScore (quest/hideout requirement)
              + teamNeedBonus (teammate also needs this item)
 ```
 - Items needed for active goal's open tasks and hideout modules
+- **Structured item data**: item names and IDs come from the tarkov.dev GraphQL API's structured `TaskObjectiveItem.item` field (canonical `name`, `id`, `shortName`), not parsed from objective descriptions. The `TASKS_QUERY` uses inline fragments (`... on TaskObjectiveItem { item { id name shortName } count foundInRaid }`) to fetch this data. Objectives without an `item` reference (e.g., generic "Hand over the items") are skipped.
+- **FIR flag**: each `WatchlistItem` carries a `fir: boolean`. Set from `TaskObjectiveItem.foundInRaid` API field. Rendered as a `FIR` badge next to the item name.
+- **Deduplication**: when multiple objectives reference the same item (e.g., `findItem` + `giveItem` for the same item in the same quest), deduplicate by `item.id`. If a later entry has `foundInRaid: true`, the existing entry's `fir` flag is updated.
+- **Fence exclusion**: Fence trader quests are excluded from the actionable task set entirely (Scav-only / karma quests are irrelevant to PMC raid recommendations).
+- **Hideout items**: items needed for the next incomplete hideout module are included in the watchlist. Cross-reference `hideoutModulesProgress` (TarkovTracker, which modules are incomplete) with `hideoutStations` (tarkov.dev, which items each level requires). `reason` shows "Hideout: {Station} Lv{N} (×{count})".
+- **Reason subtitle with wiki link**: each `WatchlistItem` carries `reason: string` (e.g., "Therapist: Shortage") displayed as an inline subtitle, and `reasonWikiLink?: string` making the subtitle a clickable link to the Tarkov wiki for quest-sourced items. No hover tooltip — the subtitle is sufficient context. Hideout-sourced items have no wiki link.
 - **Team bonus**: items that teammates also need get a priority boost and "teammate also needs" label
 - Sorted by priority score
 - Show top 5-8 items
@@ -136,9 +143,9 @@ teamBenefit = Σ(teammatesWithOpenObjectivesOnRecommendedMap)
 |-----------|----------|------|-------------|
 | `DashboardGrid` | `features/dashboard/components/dashboard-grid.tsx` | Client | Layout wrapper. Reads the active vibe's composition entry from `lib/dashboard-layout.ts` and dispatches between two shapes: `12col-with-secondary` (Loot Run, Boss Rush) and `2col-split` (PvP / Mixed). Accepts named slots (`hero`, `secondary`, `sidebar`) and an ordered list of card descriptors `{ component, variant, props }` per slot. |
 | `MapRecommendationCard` | `features/dashboard/components/map-recommendation.tsx` | Client | TTI "Map Protocol" / "Map Recommendation" / "Target Area" card. Variants: `compact` (icon + name + paragraph) and `hero` (Optimal-Pick header pill + name + paragraph + visual "Clear Map" button — see "Visual-only controls"). Always shows team benefit badge when team data is available. |
-| `LoadoutSuggestionCard` | `features/dashboard/components/loadout-suggestion.tsx` | Client | "Kit Proposal" / "Recommended Kit" card. Variants: `compact` (2 label/mono-value rows — Loot Run), `kit-categorized` (4 rows: Primary WPN / Ammo / Armor / Utility, separators, right-aligned mono values — Boss Rush), `kit-detailed` (3 equipment rows with 32px icon tiles + per-row sub-labels + "EST. TOTAL COST {budget} ₽" footer + "Budget Pick" header pill — PvP hero). |
+| `LoadoutSuggestionCard` | `features/dashboard/components/loadout-suggestion.tsx` | Client | **Deferred** — "Kit Proposal" / "Recommended Kit" card. Removed from all layout compositions until the Loadout Module (spec-015) is implemented. Variants: `compact`, `kit-categorized`, `kit-detailed`. Component code retained for future use. |
 | `POIList` | `features/dashboard/components/poi-list.tsx` | Client | "High-Value Loot POIs" / "Points of Interest". Variants: `detailed` (full card per POI: dot + name + risk pill + description paragraph — Loot Run hero, Boss Rush) and `compact` (single line: dot + name + risk pill — PvP sidebar). Accepts `sortMode: 'priority' | 'boss-spawn-proximity'`; Boss Rush uses the latter. |
-| `ItemWatchlist` | `features/dashboard/components/item-watchlist.tsx` | Client | "Item Watchlist" / "Loot Watchlist". Variants: `hero` (32px icon tile per row + item name + multi-location description, optional goal-bound header pill "PRESTIGE TARGETS" / "ACTIVE QUESTS" — Loot Run hero) and `compact` (single inline row: small icon + name + right-aligned mono source label — Boss Rush + PvP sidebars). |
+| `ItemWatchlist` | `features/dashboard/components/item-watchlist.tsx` | Client | "Item Watchlist" / "Loot Watchlist". Variants: `hero` (32px icon tile per row + canonical item name + FIR badge + reason subtitle as clickable wiki link, optional goal-bound header pill "PRESTIGE TARGETS" / "ACTIVE QUESTS" — Loot Run secondary) and `compact` (single inline row: small icon + name + FIR badge + right-aligned mono reason with wiki link — PvP + Boss Rush sidebars). No hover tooltip — subtitle is sufficient. |
 | `ThreatAssessmentCard` | `features/dashboard/components/threat-assessment.tsx` | Client | **Renamed/restructured `RiskPanel`** — dedicated `border-destructive/30` tactical card. Accepts `format: 'tiles' \| 'rows' \| 'bars'` per the spec above. Consumes `useGoonReports()`. |
 | `QuickAnalysisCard` | `features/dashboard/components/quick-analysis.tsx` | Client | **New, vibe-specific (Loot Run).** Two horizontal meter rows: "LOOT DENSITY" (0–100%, primary fill) + "SURVIVAL PROB" (0–100%, destructive fill). Both values come from `vibeIntelData` (engine output — see Hooks). |
 | `BossEncounterCard` | `features/dashboard/components/boss-encounter.tsx` | Client | **New, vibe-specific (Boss Rush).** Two-column grid. Left: bullet list with icons — Spawn Points, Guard Status, Unique Loot. Right: "Tactical Approach" + "Flank Maneuvers" paragraphs. Content sourced from `lib/boss-intel.ts` keyed by `{mapId, bossId}`, populated from `maps.bosses[]` + curated tactical notes. |
@@ -154,9 +161,9 @@ teamBenefit = Σ(teammatesWithOpenObjectivesOnRecommendedMap)
 - **`kit-detailed`** — Loadout-only third variant for the PvP hero slot. See `LoadoutSuggestionCard` row above.
 - **`format`** (Threat Assessment only) — orthogonal to `variant`; chooses between `tiles` / `rows` / `bars`. Set per slot in the composition map.
 
-### Visual-only controls
+### Deferred controls
 
-- **"Clear Map" button** on the PvP hero `MapRecommendationCard` is a visual element only — it ships with no behavior in this iteration. No re-roll, no map pinning, no state change. Rendering matches the Stitch primary-styled button so the layout is faithful; click handler is a no-op (or omitted). Resolves the deferred "re-roll" question by deferring it again, intentionally.
+- **"Clear Map" / re-roll button** — fully deferred, **not rendered**. The original Stitch reference showed a "Clear Map" button on the PvP hero `MapRecommendationCard`, but user testing showed it was confusing without behavior. Removed from the UI. Re-roll / alternative map logic is a future feature.
 
 ## Layout Composition
 
@@ -174,9 +181,9 @@ The Dashboard supports **two layout shapes**; the active vibe selects one and as
 
 | Vibe | Shape | Left / Hero stack | Secondary | Sidebar / Right stack |
 |------|-------|-------------------|-----------|------------------------|
-| Loot Run | `12col-with-secondary` | `ItemWatchlist` (`hero`) | `POIList` (`detailed`) | `MapRecommendationCard` (`compact`) → `ThreatAssessmentCard` (`rows`) → `QuickAnalysisCard` → `LoadoutSuggestionCard` (`compact`) |
-| PvP / Mixed | `2col-split` | `LoadoutSuggestionCard` (`kit-detailed`) → `ThreatAssessmentCard` (`bars`) → `CombatStrategyCard` | — | `MapRecommendationCard` (`hero`) → `POIList` (`compact`) → `ItemWatchlist` (`compact`) → `TeamImpactPanel` |
-| Boss Rush | `12col-with-secondary` | `ThreatAssessmentCard` (`tiles`) | `BossEncounterCard` + `POIList` (`detailed`, `sortMode: 'boss-spawn-proximity'`) — two cards in row 2 | `MapRecommendationCard` (`compact`) → `ItemWatchlist` (`compact`) → `LoadoutSuggestionCard` (`kit-categorized`) |
+| Loot Run | `12col-with-secondary` | `POIList` (`detailed`) | `ItemWatchlist` (`hero`) | `MapRecommendationCard` (`compact`) → `ThreatAssessmentCard` (`rows`) → `QuickAnalysisCard` |
+| PvP / Mixed | `2col-split` | `ThreatAssessmentCard` (`bars`) → `CombatStrategyCard` | — | `MapRecommendationCard` (`hero`) → `POIList` (`compact`) → `ItemWatchlist` (`compact`) → `TeamImpactPanel` |
+| Boss Rush | `12col-with-secondary` | `ThreatAssessmentCard` (`tiles`) | `BossEncounterCard` + `POIList` (`detailed`, `sortMode: 'boss-spawn-proximity'`) — two cards in row 2 | `MapRecommendationCard` (`compact`) → `ItemWatchlist` (`compact`) |
 
 **Rationale notes**:
 - The same `MapRecommendationCard` / `ThreatAssessmentCard` / `LoadoutSuggestionCard` / `POIList` / `ItemWatchlist` components are reused across all three vibes; only the variant/format and ordering change.
@@ -211,8 +218,8 @@ When no intel exists for the recommended map (e.g., Boss Rush recommended Custom
 ### Functional
 - [x] Dashboard is the homepage (`/`) — first thing the player sees
 - [x] Page renders inside the shared `PageHeader` with title "INTEL BRIEFING", subtitle "Next Raid Parameters Confirmed.", and `actions` slot containing **`LabeledSelector` ×2** (Vibe + Active Directive)
-- [x] Map Recommendation: map name, reasoning paragraph, quest objective count, raid duration in mono
-- [x] `MapRecommendationCard` renders the variant assigned by the composition (`compact` or `hero`). Hero variant includes the "Optimal Pick" header pill and the **visual-only "Clear Map" button** (no behavior).
+- [x] Map Recommendation: map name, reasoning paragraph, quest objective count, raid duration in mono, **computed in-game clock times** (two available raid start times displayed as "DAY HH:MM / NIGHT HH:MM", ticking in real time via the 7x Tarkov time multiplier)
+- [x] `MapRecommendationCard` renders the variant assigned by the composition (`compact` or `hero`). Hero variant includes the "Optimal Pick" header pill. "Clear Map" button is **deferred and not rendered** (see Deferred Controls).
 - [x] **Team context in map recommendation**: teammate benefit badge (rendered in both variants)
 - [x] Loadout Suggestion: weapon class, armor class, rig, total budget estimate — rendered as categorized rows (Primary WPN / Ammo / Armor / Utility) with separators between
 - [x] `LoadoutSuggestionCard` supports three variants (`compact`, `kit-categorized`, `kit-detailed`) per the UI Components table. `kit-detailed` includes the per-row icon tiles, sub-labels, header pill, and "EST. TOTAL COST" footer.
@@ -224,7 +231,7 @@ When no intel exists for the recommended map (e.g., Boss Rush recommended Custom
 - [x] `ThreatAssessmentCard` supports `format: 'tiles' | 'rows' | 'bars'` per the spec above; the format is set by the layout composition, not by the active vibe directly. The PvP `bars` format replaces the Danger Level tile with **PMC Frequency**.
 - [x] **Goon Sighting**: consumes `useGoonReports().byMap(recommendedMapId)`. Shows "SIGHTED" with relative timestamp and POI when present; "CLEAR" when none; "STALE" when last sighting >30 min old. Behaviour is identical across all three Threat formats; only the visual containment changes.
 - [x] **Vibe-specific intel cards**: exactly one of `QuickAnalysisCard` / `BossEncounterCard` / `CombatStrategyCard` renders, driven by `vibe.intelCard` (see spec-005). Each consumes `vibeIntelData` from `useRaidPlan()`.
-- [x] `QuickAnalysisCard` (Loot Run) renders two horizontal meter rows: LOOT DENSITY (primary fill) + SURVIVAL PROB (destructive fill).
+- [x] `QuickAnalysisCard` (Loot Run) renders two horizontal meter rows: LOOT DENSITY (primary fill) + SURVIVAL PROB (destructive fill). Each meter includes a muted subtitle explaining the data source: Loot Density → "Based on quest item density on this map"; Survival Prob. → "Estimated from boss spawn rates and threat level".
 - [x] `BossEncounterCard` (Boss Rush) renders a 2-col grid: Spawn Points / Guard Status / Unique Loot bullets on the left, Tactical Approach + Flank Maneuvers paragraphs on the right. Content sourced from `lib/boss-intel.ts`.
 - [x] `CombatStrategyCard` (PvP / Mixed) renders 2–3 named tactical-notes protocols (e.g., CQB Protocol, Anti-Goon Maneuver). Content sourced from `lib/combat-protocols.ts`.
 - [x] When intel data is missing for the recommended map, the intel card renders a "Intel not yet available" empty state inside the same card frame — never `null`.
@@ -281,7 +288,7 @@ When no intel exists for the recommended map (e.g., Boss Rush recommended Custom
 
 ## Open Questions
 - ✅ Resolved: Loadout suggestions — **tiers for the `compact` and `kit-categorized` variants** (e.g., "Class 4+ Mobile", "SMG / High RoF"), **specific item names for the PvP `kit-detailed` variant** (e.g., "AK-74N", "Trooper Armor", "BlackHawk Rig"). Specific item picks come from a heuristic over the player's trader levels + budget.
-- ✅ Resolved: "Re-roll" / alternative recommendation — **not implemented**. The PvP `MapRecommendationCard` ships a visual-only "Clear Map" button to match Stitch, but it has no behavior. Revisit if user feedback warrants it.
+- ✅ Resolved: "Re-roll" / alternative recommendation — **fully deferred**. The "Clear Map" button has been removed from the UI after user testing showed it was confusing without behavior. Revisit when map pinning / re-roll logic is designed.
 - ❓ How to handle POI coordinates — are these available from tarkov.dev or need manual data? Recommend: use tarkov.dev map data if available, otherwise omit coordinates and show zone names.
 - ❓ How heavily should team overlap weight in scoring? Recommend: configurable `teamWeight` constant, default to 0.3x per teammate (meaningful but doesn't override individual quest density).
 - ❓ Should Goon Sighting feed into the **map scoring formula** (down-weighting maps with recent sightings for Loot Run vibe, up-weighting for PvP)? Recommend: yes, as a small `goonSightingWeight × vibe.riskTolerance` adjustment — keeps Loot Run vibes naturally avoiding hot zones.

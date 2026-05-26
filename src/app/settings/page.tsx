@@ -2,12 +2,9 @@
 
 import { TokenInput } from "@/features/settings/components/token-input";
 import { DataSyncPanel } from "@/features/settings/components/data-sync-panel";
-import { usePlayerState } from "@/hooks/use-player-state";
 import { PageHeader } from "@/components/layout/page-header";
 
 export default function SettingsPage() {
-  const { gameMode } = usePlayerState();
-
   return (
     <div className="p-4 md:p-6 lg:p-8">
       <div className="mx-auto max-w-4xl space-y-6">
@@ -35,40 +32,6 @@ export default function SettingsPage() {
             (read) permission. Paste it below to enable live progression data.
           </p>
           <TokenInput />
-        </section>
-
-        <section className="rounded-xl border bg-card p-5 space-y-4">
-          <h2 className="text-lg font-semibold">Game Mode</h2>
-          <p className="text-sm text-muted-foreground">
-            Automatically detected from your token prefix.
-          </p>
-          <div className="flex items-center gap-3">
-            <div className="flex gap-2">
-              <span
-                className={`inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                  gameMode === "pvp"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
-                }`}
-              >
-                PVP
-              </span>
-              <span
-                className={`inline-flex items-center rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                  gameMode === "pve"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
-                }`}
-              >
-                PVE
-              </span>
-            </div>
-            {!gameMode && (
-              <span className="text-xs text-muted-foreground">
-                Connect to auto-detect
-              </span>
-            )}
-          </div>
         </section>
       </div>
     </div>

@@ -6,7 +6,6 @@ import { GoalCard } from "@/features/goals/components/goal-card";
 import { ActiveDirectiveFocus } from "@/features/goals/components/active-directive-focus";
 import { ProgressionSummary } from "@/features/goals/components/progression-summary";
 import { OpenQuestsPreview } from "@/features/goals/components/open-quests-preview";
-import { DirectiveScopeFilter } from "@/features/goals/components/directive-scope-filter";
 import { TarkovTrackerProfileLink } from "@/features/goals/components/tarkov-tracker-profile-link";
 import { GOALS } from "@/features/goals/types";
 import { PageHeader } from "@/components/layout/page-header";
@@ -21,10 +20,6 @@ export default function GoalsPage() {
     gameDataLoaded,
     prestigeTarget,
     setPrestigeTarget,
-    directiveScope,
-    setDirectiveScope,
-    scopeOptions,
-    scopedProgress,
   } = useGoalState();
   const { isConnected, progress } = usePlayerState();
 
@@ -32,7 +27,7 @@ export default function GoalsPage() {
   // goal selected yet — the focus card always renders so the page never looks
   // empty.
   const focusGoal = goalDefinition ?? GOALS[0];
-  const focusProgress = scopedProgress ?? activeGoalProgress;
+  const focusProgress = activeGoalProgress;
 
   return (
     <div className="p-4 md:p-6 lg:p-8">
@@ -57,18 +52,11 @@ export default function GoalsPage() {
             />
           </div>
 
-          {/* Sidebar column: Scope filter + Progression Summary + Open Quests */}
+          {/* Sidebar column: Progression Summary + Open Quests */}
           <aside className="lg:col-span-4 flex flex-col gap-4 lg:gap-6 min-w-0 lg:sticky lg:top-20 lg:self-start">
-            <DirectiveScopeFilter
-              options={scopeOptions}
-              value={directiveScope}
-              onChange={setDirectiveScope}
-            />
             <ProgressionSummary
               activeGoal={activeGoal}
               activeGoalProgress={activeGoalProgress}
-              currentScope={directiveScope}
-              onScopeSelect={setDirectiveScope}
             />
             <OpenQuestsPreview
               openTasks={focusProgress?.openTasks ?? []}

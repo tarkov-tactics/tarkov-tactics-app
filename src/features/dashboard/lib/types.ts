@@ -50,8 +50,8 @@ export interface PrioritizedPOI {
   lootExpectation: string;
   keyRequired?: string;
   riskLevel: 'low' | 'medium' | 'high';
-  /** Items the player needs that can be found at this POI */
-  neededItems?: string[];
+  /** Items the player needs that can be found at this POI, with per-item tooltip reasons */
+  neededItems?: Array<{ name: string; reason: string; wikiLink?: string }>;
   /** Loot categories available at this POI */
   lootCategories?: string[];
   /** Quest objectives at this location */
@@ -63,6 +63,10 @@ export interface WatchlistItem {
   itemName: string;
   priorityScore: number;
   reason: string;
+  /** Wiki link for the quest/source referenced in `reason`. */
+  reasonWikiLink?: string;
+  /** Whether this item must be Found In Raid. */
+  fir: boolean;
 }
 
 export interface RiskIndicator {

@@ -16,29 +16,44 @@ export default function TeamPage() {
   const { teammates, hasTeamPermission, isLoading, lastUpdated, refresh } =
     useTeamState();
 
-  const taskNameById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const t of gameTasks) map.set(t.id, t.name);
+  const taskInfoById = useMemo(() => {
+    const map = new Map<string, { name: string; wikiLink: string }>();
+    for (const t of gameTasks) map.set(t.id, { name: t.name, wikiLink: t.wikiLink });
     return map;
   }, [gameTasks]);
 
-  const playerOpenTaskIds = new Set(
-    progress?.tasksProgress
-      .filter((t) => !t.complete && !t.failed)
-      .map((t) => t.id) ?? []
-  );
+  const playerOpenTaskIds = useMemo(() => {
+    if (!progress) return new Set<string>();
+    const completedIds = new Set(
+      progress.tasksProgress.filter((t) => t.complete).map((t) => t.id)
+    );
+    const failedIds = new Set(
+      progress.tasksProgress.filter((t) => t.failed).map((t) => t.id)
+    );
+    const actionable = new Set<string>();
+    for (const task of gameTasks) {
+      if (completedIds.has(task.id) || failedIds.has(task.id)) continue;
+      if ((task.minPlayerLevel ?? 0) > progress.playerLevel) continue;
+      if (task.trader.name === 'Fence') continue;
+      const prereqsMet = (task.taskRequirements ?? []).every(
+        (req) => completedIds.has(req.task.id)
+      );
+      if (prereqsMet) actionable.add(task.id);
+    }
+    return actionable;
+  }, [progress, gameTasks]);
 
   const sharedTasks = progress
     ? getSharedOpenTasks(playerOpenTaskIds, teammates)
     : new Map<string, string[]>();
 
   function getSharedCountFor(teammate: typeof teammates[0]) {
-    let count = 0;
     const teammateOpen = new Set(
       teammate.tasksProgress
         .filter((t) => !t.complete && !t.failed)
         .map((t) => t.id)
     );
+    let count = 0;
     for (const taskId of playerOpenTaskIds) {
       if (teammateOpen.has(taskId)) count++;
     }
@@ -115,18 +130,34 @@ export default function TeamPage() {
                 <div className="space-y-2">
                   {Array.from(sharedTasks.entries())
                     .slice(0, 15)
-                    .map(([taskId, names]) => (
-                      <div
-                        key={taskId}
-                        className="flex items-center justify-between rounded-lg border bg-card px-4 py-2.5 text-sm"
-                      >
-                        <span className="truncate font-medium">{taskNameById.get(taskId) ?? taskId}</span>
-                        <span className="flex items-center gap-1 text-xs text-primary shrink-0 ml-2">
-                          <UsersIcon className="size-3" />
-                          {names.length} teammate{names.length > 1 ? "s" : ""}
-                        </span>
-                      </div>
-                    ))}
+                    .map(([taskId, names]) => {
+                      const info = taskInfoById.get(taskId);
+                      return (
+                        <div
+                          key={taskId}
+                          className="flex items-center justify-between rounded-lg border bg-card px-4 py-2.5 text-sm"
+                        >
+                          {info?.wikiLink ? (
+                            <a
+                              href={info.wikiLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="truncate font-medium text-foreground hover:text-primary transition-colors"
+                            >
+                              {info.name}
+                            </a>
+                          ) : (
+                            <span className="truncate font-medium">
+                              {info?.name ?? taskId}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1 text-xs text-primary shrink-0 ml-2">
+                            <UsersIcon className="size-3" />
+                            {names.length} teammate{names.length > 1 ? "s" : ""}
+                          </span>
+                        </div>
+                      );
+                    })}
                 </div>
               )}
             </section>

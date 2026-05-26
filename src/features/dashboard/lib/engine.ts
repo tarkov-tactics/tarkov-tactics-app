@@ -8,7 +8,7 @@ import type {
   VibeIntelData,
 } from './types';
 import type { ProgressData } from '@/lib/api/tarkov-tracker/types';
-import type { TarkovTask, TarkovMap } from '@/lib/api/tarkov-dev/types';
+import type { TarkovTask, TarkovMap, HideoutStation } from '@/lib/api/tarkov-dev/types';
 import type { VibeModifier } from '@/features/vibes/types';
 import { getBossIntel } from './boss-intel';
 import { getCombatProtocols } from './combat-protocols';
@@ -30,6 +30,7 @@ function getActionableTaskIds(
   for (const task of tasks) {
     if (completedIds.has(task.id) || failedIds.has(task.id)) continue;
     if ((task.minPlayerLevel ?? 0) > progress.playerLevel) continue;
+    if (task.trader.name === 'Fence') continue;
 
     const prereqsMet = (task.taskRequirements ?? []).every(
       (req) => completedIds.has(req.task.id)
@@ -270,20 +271,100 @@ function matchItemToLootCategory(description: string): string[] {
   return [];
 }
 
+const HIDEOUT_ITEM_CATEGORIES: Record<string, string[]> = {
+  'salewa': ['medical'],
+  'car first aid kit': ['medical'],
+  'ifak': ['medical'],
+  'grizzly': ['medical'],
+  'hose': ['barter'],
+  'bolts': ['barter'],
+  'nut': ['barter'],
+  'screw': ['barter'],
+  'bulb': ['barter', 'electronics'],
+  'wire': ['electronics'],
+  'relay': ['electronics'],
+  'circuit': ['electronics'],
+  'battery': ['electronics'],
+  'cpu fan': ['electronics'],
+  'power supply': ['electronics'],
+  'gpu': ['electronics'],
+  'graphics card': ['electronics'],
+  'gas analyzer': ['electronics'],
+  'fuel': ['fuel'],
+  'expeditionary fuel': ['fuel'],
+  'metal fuel tank': ['fuel'],
+  'drill': ['barter'],
+  'wrench': ['barter'],
+  'screwdriver': ['barter'],
+  'tape': ['barter'],
+  'pliers': ['barter'],
+  'capacitor': ['electronics'],
+  'motor': ['barter'],
+  'filter': ['barter'],
+  'tube': ['medical'],
+  'ledx': ['electronics', 'medical'],
+};
+
+function matchHideoutItemToCategories(name: string): string[] {
+  const lower = name.toLowerCase();
+  for (const [keyword, categories] of Object.entries(HIDEOUT_ITEM_CATEGORIES)) {
+    if (lower.includes(keyword)) return categories;
+  }
+  return [];
+}
+
+interface HideoutNeed {
+  itemName: string;
+  stationLabel: string;
+  categories: string[];
+}
+
+function getHideoutNeeds(
+  progress: ProgressData,
+  hideoutStations: HideoutStation[],
+): HideoutNeed[] {
+  const completedModuleIds = new Set(
+    progress.hideoutModulesProgress.filter((m) => m.complete).map((m) => m.id)
+  );
+  const needs: HideoutNeed[] = [];
+
+  for (const station of hideoutStations) {
+    const sortedLevels = [...station.levels].sort((a, b) => a.level - b.level);
+    for (const lvl of sortedLevels) {
+      const moduleId = `${station.id}-${lvl.level}`;
+      if (completedModuleIds.has(moduleId) || completedModuleIds.has(station.id)) continue;
+
+      for (const req of lvl.itemRequirements) {
+        needs.push({
+          itemName: req.item.name,
+          stationLabel: `${station.name} Lv${lvl.level}`,
+          categories: matchHideoutItemToCategories(req.item.name),
+        });
+      }
+      break;
+    }
+  }
+  return needs;
+}
+
 function rankPOIs(
   mapName: string,
   tasks: TarkovTask[],
   playerOpenTaskIds: Set<string>,
   vibeModifier: VibeModifier,
-  maps: TarkovMap[]
+  maps: TarkovMap[],
+  progress: ProgressData,
+  hideoutStations: HideoutStation[],
 ): PrioritizedPOI[] {
   const mapData = maps.find((m) => m.name === mapName);
   const knownPOIs = MAP_POIS[mapName] ?? [];
 
+  interface POIItemInfo { reason: string; wikiLink?: string }
   const neededCategories = new Set<string>();
-  const neededItemNames = new Map<string, Set<string>>();
+  const neededItemNames = new Map<string, Map<string, POIItemInfo>>();
   const questContext = new Map<string, string[]>();
 
+  // Quest-driven needs — use structured item data from the API
   for (const task of tasks) {
     if (!playerOpenTaskIds.has(task.id)) continue;
     for (const obj of task.objectives) {
@@ -295,11 +376,9 @@ function rankPOIs(
 
       if (!isMapSpecific && !(isItemObj && isAnyMap)) continue;
 
-      const categories = matchItemToLootCategory(obj.description);
+      const itemRef = obj.item ?? obj.questItem;
+      const categories = itemRef ? matchItemToLootCategory(itemRef.name) : matchItemToLootCategory(obj.description);
       for (const cat of categories) neededCategories.add(cat);
-
-      const itemMatch = obj.description.match(/(?:Find|Hand over|Obtain)\s+(?:the\s+)?(?:found in raid\s+)?(?:item:\s+)?(.+)/i);
-      const itemName = itemMatch?.[1]?.trim().replace(/\s*\(.*\)$/, '').replace(/s$/, '') ?? null;
 
       for (const poi of knownPOIs) {
         const overlaps = poi.lootTypes.some((lt) => categories.includes(lt));
@@ -308,12 +387,32 @@ function rankPOIs(
           ctx.push(`${task.name}: ${obj.description}`);
           questContext.set(poi.name, ctx);
 
-          if (itemName && overlaps) {
-            const items = neededItemNames.get(poi.name) ?? new Set();
-            items.add(itemName);
+          if (itemRef && overlaps) {
+            const fir = obj.foundInRaid === true;
+            const pillLabel = fir ? `${itemRef.name} - FIR` : itemRef.name;
+            const items = neededItemNames.get(poi.name) ?? new Map<string, POIItemInfo>();
+            if (!items.has(pillLabel)) {
+              items.set(pillLabel, { reason: `${task.trader.name}: ${task.name}`, wikiLink: task.wikiLink });
+            }
             neededItemNames.set(poi.name, items);
           }
         }
+      }
+    }
+  }
+
+  // Hideout-driven needs — boost POIs that spawn items needed for hideout upgrades
+  const hideoutNeeds = getHideoutNeeds(progress, hideoutStations);
+  for (const need of hideoutNeeds) {
+    for (const cat of need.categories) neededCategories.add(cat);
+
+    for (const poi of knownPOIs) {
+      if (poi.lootTypes.some((lt) => need.categories.includes(lt))) {
+        const items = neededItemNames.get(poi.name) ?? new Map<string, POIItemInfo>();
+        if (!items.has(need.itemName)) {
+          items.set(need.itemName, { reason: `Hideout: ${need.stationLabel}` });
+        }
+        neededItemNames.set(poi.name, items);
       }
     }
   }
@@ -322,26 +421,24 @@ function rankPOIs(
     .map((poi) => {
       const matchingCategories = poi.lootTypes.filter((lt) => neededCategories.has(lt));
       const quests = questContext.get(poi.name) ?? [];
-      const items = neededItemNames.get(poi.name);
+      const itemMap = neededItemNames.get(poi.name);
 
-      const reasons: string[] = [];
-      if (items && items.size > 0) {
-        reasons.push([...items].slice(0, 2).join(', '));
-      }
-      if (matchingCategories.length > 0) {
-        reasons.push(matchingCategories.join(' · ') + ' loot');
-      }
+      const neededItems = itemMap
+        ? [...itemMap.entries()].map(([name, info]) => ({ name, reason: info.reason, wikiLink: info.wikiLink }))
+        : undefined;
+
+      const lootExpectation = matchingCategories.length > 0
+        ? matchingCategories.join(' · ') + ' loot'
+        : poi.lootTypes.join(', ');
 
       return {
         name: poi.name,
-        lootExpectation: reasons.length > 0
-          ? reasons.join(' · ')
-          : poi.lootTypes.join(', '),
+        lootExpectation,
         riskLevel: poi.risk,
-        neededItems: items ? [...items] : undefined,
+        neededItems,
         lootCategories: matchingCategories.length > 0 ? matchingCategories : poi.lootTypes,
         questObjectives: quests.length > 0 ? quests : undefined,
-        _relevance: matchingCategories.length + quests.length + (items?.size ?? 0) * 2,
+        _relevance: matchingCategories.length + quests.length + (itemMap?.size ?? 0) * 2,
       };
     })
     .sort((a, b) => b._relevance - a._relevance)
@@ -367,26 +464,71 @@ function rankPOIs(
 function buildWatchlist(
   tasks: TarkovTask[],
   playerOpenTaskIds: Set<string>,
-  vibeModifier: VibeModifier
+  vibeModifier: VibeModifier,
+  progress: ProgressData,
+  hideoutStations: HideoutStation[],
 ): WatchlistItem[] {
-  const items: WatchlistItem[] = [];
+  const seen = new Map<string, WatchlistItem>();
 
+  // Quest items — use structured item data from the API
   for (const task of tasks) {
     if (!playerOpenTaskIds.has(task.id)) continue;
     for (const obj of task.objectives) {
-      if (obj.type === 'giveItem' || obj.type === 'findItem') {
-        items.push({
-          itemId: obj.id,
-          itemName: obj.description,
-          priorityScore:
-            vibeModifier.poiPriority === 'loot' ? 2 : 1,
-          reason: `Quest: ${task.name} (${task.trader.name})`,
-        });
+      if (obj.type !== 'giveItem' && obj.type !== 'findItem') continue;
+
+      const itemRef = obj.item;
+      if (!itemRef) continue;
+
+      const normalizedKey = itemRef.id;
+      const fir = obj.foundInRaid === true;
+      const priority = vibeModifier.poiPriority === 'loot' ? 2 : 1;
+
+      const existing = seen.get(normalizedKey);
+      if (existing) {
+        if (fir) existing.fir = true;
+        continue;
       }
+
+      seen.set(normalizedKey, {
+        itemId: itemRef.id,
+        itemName: itemRef.name,
+        priorityScore: priority,
+        reason: `${task.trader.name}: ${task.name}`,
+        reasonWikiLink: task.wikiLink,
+        fir,
+      });
     }
   }
 
-  return items
+  // Hideout items — find the next incomplete level per station and add its required items
+  const completedModuleIds = new Set(
+    progress.hideoutModulesProgress.filter((m) => m.complete).map((m) => m.id)
+  );
+
+  for (const station of hideoutStations) {
+    const sortedLevels = [...station.levels].sort((a, b) => a.level - b.level);
+    for (const lvl of sortedLevels) {
+      const moduleId = `${station.id}-${lvl.level}`;
+      if (completedModuleIds.has(moduleId) || completedModuleIds.has(station.id)) continue;
+
+      for (const req of lvl.itemRequirements) {
+        const normalizedKey = req.item.name.toLowerCase();
+        if (seen.has(normalizedKey)) continue;
+
+        const label = `${station.name} Lv${lvl.level}`;
+        seen.set(normalizedKey, {
+          itemId: req.item.id,
+          itemName: req.item.name,
+          priorityScore: vibeModifier.poiPriority === 'loot' ? 1.5 : 0.8,
+          reason: `Hideout: ${label} (×${req.count})`,
+          fir: false,
+        });
+      }
+      break; // only the next incomplete level per station
+    }
+  }
+
+  return [...seen.values()]
     .sort((a, b) => b.priorityScore - a.priorityScore)
     .slice(0, 8);
 }
@@ -483,7 +625,8 @@ export function computeRaidPlan(
   maps: TarkovMap[],
   vibeModifier: VibeModifier,
   teammates: ProgressData[],
-  hasGoonSighting = false
+  hasGoonSighting = false,
+  hideoutStations: HideoutStation[] = [],
 ): RaidPlanResult {
   const playerOpenTaskIds = getActionableTaskIds(progress, tasks);
 
@@ -513,8 +656,8 @@ export function computeRaidPlan(
   };
 
   const loadout = computeLoadout(progress.playerLevel, vibeModifier);
-  const pois = rankPOIs(bestMap.mapName, tasks, playerOpenTaskIds, vibeModifier, maps);
-  const watchlist = buildWatchlist(tasks, playerOpenTaskIds, vibeModifier);
+  const pois = rankPOIs(bestMap.mapName, tasks, playerOpenTaskIds, vibeModifier, maps, progress, hideoutStations);
+  const watchlist = buildWatchlist(tasks, playerOpenTaskIds, vibeModifier, progress, hideoutStations);
   const risks = assessRisks(bestMap.mapName, maps);
 
   const topBossSpawnChance = (bestMapData?.bosses ?? []).reduce(

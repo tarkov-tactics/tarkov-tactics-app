@@ -32,6 +32,15 @@ export const TASKS_QUERY = `
         id
         type
         description
+        ... on TaskObjectiveItem {
+          item { id name shortName }
+          count
+          foundInRaid
+        }
+        ... on TaskObjectiveQuestItem {
+          questItem { id name shortName }
+          count
+        }
         maps { name }
       }
     }

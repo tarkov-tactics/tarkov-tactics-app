@@ -29,6 +29,14 @@ function pickIcon(name: string): LucideIcon {
   return Package;
 }
 
+function FIRBadge() {
+  return (
+    <span className="inline-flex items-center rounded-full border border-amber/30 bg-amber/10 px-1.5 py-0.5 text-[9px] font-semibold font-mono text-amber whitespace-nowrap">
+      FIR
+    </span>
+  );
+}
+
 export function ItemWatchlist({
   items,
   variant = "hero",
@@ -68,10 +76,22 @@ export function ItemWatchlist({
                   <span className="text-xs font-medium truncate">
                     {item.itemName}
                   </span>
+                  {item.fir && <FIRBadge />}
                 </div>
-                <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">
-                  {item.reason}
-                </span>
+                {item.reasonWikiLink ? (
+                  <a
+                    href={item.reasonWikiLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] font-mono text-muted-foreground whitespace-nowrap hover:text-primary transition-colors"
+                  >
+                    {item.reason}
+                  </a>
+                ) : (
+                  <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">
+                    {item.reason}
+                  </span>
+                )}
               </div>
             );
           })}
@@ -89,12 +109,26 @@ export function ItemWatchlist({
                   <Icon className="size-4 text-primary" aria-hidden />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium leading-none">
-                    {item.itemName}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground leading-snug">
-                    {item.reason}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium leading-none">
+                      {item.itemName}
+                    </p>
+                    {item.fir && <FIRBadge />}
+                  </div>
+                  {item.reasonWikiLink ? (
+                    <a
+                      href={item.reasonWikiLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 text-xs text-muted-foreground leading-snug hover:text-primary transition-colors block"
+                    >
+                      {item.reason}
+                    </a>
+                  ) : (
+                    <p className="mt-1 text-xs text-muted-foreground leading-snug">
+                      {item.reason}
+                    </p>
+                  )}
                 </div>
               </div>
             );

@@ -30,6 +30,14 @@ export interface TarkovObjective {
   type: string;
   description: string;
   maps: Array<{ name: string }>;
+  /** Structured item data (TaskObjectiveItem). */
+  item?: { id: string; name: string; shortName: string };
+  /** Structured quest item data (TaskObjectiveQuestItem). */
+  questItem?: { id: string; name: string; shortName: string };
+  /** Required count. */
+  count?: number;
+  /** Whether the item must be found in raid. */
+  foundInRaid?: boolean;
 }
 
 export interface TarkovMap {

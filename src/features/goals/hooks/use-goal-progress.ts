@@ -173,7 +173,7 @@ function computePrestigeAxes(
     label: tier.gatingQuestName,
     current: questProgress.completed,
     target: questProgress.total,
-    met: questProgress.openTasks.length === 0 && questProgress.total > 0,
+    met: questProgress.completed >= questProgress.total && questProgress.total > 0,
   });
 
   // Hideout module axes
@@ -278,8 +278,14 @@ function computeProgressForTasks(
   );
 
   const completedTasks = goalTasks.filter((t) => completedIds.has(t.id));
-  const openTasks = goalTasks.filter((t) => !completedIds.has(t.id));
   const completed = completedTasks.length;
+
+  const openTasks = goalTasks
+    .filter((t) => !completedIds.has(t.id))
+    .filter((t) => {
+      if ((t.minPlayerLevel ?? 0) > progress.playerLevel) return false;
+      return (t.taskRequirements ?? []).every((req) => completedIds.has(req.task.id));
+    });
 
   return {
     total,

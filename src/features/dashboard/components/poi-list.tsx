@@ -2,6 +2,12 @@
 
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
 import type { PrioritizedPOI } from "../lib/types";
 
 interface POIListProps {
@@ -49,96 +55,120 @@ export function POIList({
   const title = variant === "compact" ? "Points of Interest" : "High-Value Loot POIs";
 
   return (
-    <div className="rounded-lg border border-border bg-card text-card-foreground">
-      <div className="p-5 pb-3 border-b border-border">
-        <h3 className="text-telemetry text-muted-foreground">{title}</h3>
-      </div>
+    <TooltipProvider>
+      <div className="rounded-lg border border-border bg-card text-card-foreground">
+        <div className="p-5 pb-3 border-b border-border">
+          <h3 className="text-telemetry text-muted-foreground">{title}</h3>
+        </div>
 
-      {ordered.length === 0 ? (
-        <div className="p-5 text-sm text-muted-foreground">
-          <p>
-            No prioritized points of interest for the current map and vibe.
-            Try a different vibe or refresh after picking up new quests.
-          </p>
-        </div>
-      ) : variant === "compact" ? (
-        <div className="p-4 space-y-2">
-          {ordered.map((poi, i) => {
-            const style = riskStyles[poi.riskLevel];
-            return (
-              <div
-                key={`${poi.name}-${i}`}
-                className="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className={cn("size-2 rounded-full shrink-0", style.dot)} aria-hidden />
-                  <p className="text-xs font-medium leading-none truncate">{poi.name}</p>
-                </div>
-                <span
-                  className={cn(
-                    "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold font-mono whitespace-nowrap",
-                    style.badge
-                  )}
+        {ordered.length === 0 ? (
+          <div className="p-5 text-sm text-muted-foreground">
+            <p>
+              No prioritized points of interest for the current map and vibe.
+              Try a different vibe or refresh after picking up new quests.
+            </p>
+          </div>
+        ) : variant === "compact" ? (
+          <div className="p-4 space-y-2">
+            {ordered.map((poi, i) => {
+              const style = riskStyles[poi.riskLevel];
+              return (
+                <div
+                  key={`${poi.name}-${i}`}
+                  className="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2"
                 >
-                  {style.label}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="p-5 space-y-3">
-          {ordered.map((poi, i) => {
-            const style = riskStyles[poi.riskLevel];
-            return (
-              <div
-                key={`${poi.name}-${i}`}
-                className="flex flex-col gap-1.5 rounded-md border border-border bg-background p-3"
-              >
-                <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span
-                      className={cn("size-2 rounded-full shrink-0", style.dot)}
-                      aria-hidden
-                    />
-                    <p className="text-sm font-medium leading-none truncate">
-                      {poi.name}
-                    </p>
+                    <span className={cn("size-2 rounded-full shrink-0", style.dot)} aria-hidden />
+                    <p className="text-xs font-medium leading-none truncate">{poi.name}</p>
                   </div>
                   <span
                     className={cn(
-                      "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold font-mono whitespace-nowrap",
+                      "inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold font-mono whitespace-nowrap",
                       style.badge
                     )}
                   >
                     {style.label}
                   </span>
                 </div>
-                {poi.neededItems && poi.neededItems.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 pl-4">
-                    {poi.neededItems.map((item) => (
+              );
+            })}
+          </div>
+        ) : (
+          <div className="p-5 space-y-3">
+            {ordered.map((poi, i) => {
+              const style = riskStyles[poi.riskLevel];
+              const hasItems = poi.neededItems && poi.neededItems.length > 0;
+              return (
+                <div
+                  key={`${poi.name}-${i}`}
+                  className="flex flex-col gap-1.5 rounded-md border border-border bg-background p-3"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
                       <span
-                        key={item}
-                        className="rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-mono tracking-wider text-primary"
-                      >
-                        {item}
-                      </span>
-                    ))}
+                        className={cn("size-2 rounded-full shrink-0", style.dot)}
+                        aria-hidden
+                      />
+                      <p className="text-sm font-medium leading-none truncate">
+                        {poi.name}
+                      </p>
+                    </div>
+                    <span
+                      className={cn(
+                        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold font-mono whitespace-nowrap",
+                        style.badge
+                      )}
+                    >
+                      {style.label}
+                    </span>
                   </div>
-                )}
-                <p className="text-xs text-muted-foreground pl-4">
-                  {poi.lootExpectation}
-                </p>
-                {poi.keyRequired && (
-                  <p className="text-[10px] font-mono text-amber pl-4">
-                    KEY: {poi.keyRequired}
-                  </p>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+                  {hasItems && (
+                    <div className="flex flex-wrap gap-1.5 pl-4">
+                      {poi.neededItems!.map((item) => (
+                        <Tooltip key={item.name}>
+                          <TooltipTrigger
+                            render={<span />}
+                            className="rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-mono tracking-wider text-primary select-text"
+                          >
+                            {item.name}
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side="top"
+                            className="max-w-xs text-[11px]"
+                          >
+                            {item.wikiLink ? (
+                              <a
+                                href={item.wikiLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-muted-foreground hover:text-primary transition-colors"
+                              >
+                                {item.reason}
+                              </a>
+                            ) : (
+                              item.reason
+                            )}
+                          </TooltipContent>
+                        </Tooltip>
+                      ))}
+                    </div>
+                  )}
+                  {!hasItems && (
+                    <p className="text-xs text-muted-foreground pl-4">
+                      {poi.lootExpectation}
+                    </p>
+                  )}
+                  {poi.keyRequired && (
+                    <p className="text-[10px] font-mono text-amber pl-4">
+                      KEY: {poi.keyRequired}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </TooltipProvider>
   );
 }

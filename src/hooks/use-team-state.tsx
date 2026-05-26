@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import type { ProgressData } from "@/lib/api/tarkov-tracker/types";
+import { usePlayerState } from "./use-player-state";
 
 // ── Storage helpers (same key as player state) ────────────────────
 const TOKEN_KEY = "tarkov-tracker-token";
@@ -38,7 +39,7 @@ const TeamStateContext = createContext<TeamStateContextValue | null>(null);
 
 // ── Provider ───────────────────────────────────────────────────────
 export function TeamStateProvider({ children }: { children: ReactNode }) {
-  const [token] = useState<string | null>(() => readToken());
+  const { isConnected } = usePlayerState();
   const [teammates, setTeammates] = useState<ProgressData[]>([]);
   const [hasTeamPermission, setHasTeamPermission] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -95,8 +96,10 @@ export function TeamStateProvider({ children }: { children: ReactNode }) {
     []
   );
 
-  // Auto-fetch on mount if token exists
+  // Fetch when player becomes connected (reacts to first-time token entry)
   useEffect(() => {
+    if (!isConnected) return;
+    const token = readToken();
     if (!token) return;
     const controller = new AbortController();
     const id = requestAnimationFrame(() => {
@@ -106,7 +109,7 @@ export function TeamStateProvider({ children }: { children: ReactNode }) {
       cancelAnimationFrame(id);
       controller.abort();
     };
-  }, [token, fetchTeamData]);
+  }, [isConnected, fetchTeamData]);
 
   const refresh = useCallback(async () => {
     const currentToken = readToken();

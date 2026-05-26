@@ -49,6 +49,7 @@ export function QuickAnalysisCard({ data }: QuickAnalysisCardProps) {
               style={{ width: `${lootDensity}%` }}
             />
           </div>
+          <p className="text-[10px] text-muted-foreground/70">Based on quest item density on this map</p>
         </div>
         <div className="space-y-2">
           <div className="flex justify-between items-center text-xs">
@@ -79,6 +80,7 @@ export function QuickAnalysisCard({ data }: QuickAnalysisCardProps) {
               style={{ width: `${survivalProbability}%` }}
             />
           </div>
+          <p className="text-[10px] text-muted-foreground/70">Estimated from boss spawn rates and threat level</p>
         </div>
       </div>
     </div>

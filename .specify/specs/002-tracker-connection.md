@@ -34,7 +34,7 @@ Data refresh strategy: the providers (`PlayerStateProvider`, `TeamStateProvider`
 |-----------|----------|------|-------------|
 | `TokenInput` | `features/settings/components/token-input.tsx` | Client | Masked input with paste, validate, and clear actions |
 | `ConnectionStatus` | `features/settings/components/connection-status.tsx` | Client | Shows validation result: player name, level, faction, permissions |
-| Game mode display | Inlined on Settings page (`app/settings/page.tsx`) | Client | PVP/PVE indicator (read-only, auto-detected from token prefix) |
+| ~~Game mode display~~ | ~~Inlined on Settings page~~ | — | **Removed** — redundant with game mode shown in `ConnectionStatus`. The game mode is already visible in the connection status card; a separate section was confusing since it's not editable. |
 | `DataSyncPanel` | `features/settings/components/data-sync-panel.tsx` | Client | Settings-page section showing **last-updated timestamp** for player + team data with a single **"Refresh Now"** button that calls `usePlayerState().refresh()` and `useTeamState().refresh()` in parallel. Hidden when disconnected. Replaces the previous global header refresh control. |
 
 ## Requirements

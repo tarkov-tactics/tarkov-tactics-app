@@ -37,8 +37,8 @@ Fetch, cache, and expose the TarkovTracker team progression data as a **first-cl
 |-----------|----------|------|-------------|
 | `TeamOverview` | `features/team/components/team-overview.tsx` | Client | Grid of teammate summary cards |
 | `TeammateCard` | `features/team/components/teammate-card.tsx` | Client | Name, level, faction, progress bar, shared task count |
-| `SharedTasksList` | `features/team/components/shared-tasks-list.tsx` | Client | Tasks multiple team members need, grouped by map |
-| `SharedTaskItem` | `features/team/components/shared-task-item.tsx` | Client | Single shared task with teammate avatars who need it |
+| ~~`SharedTasksList`~~ | — | — | **Inlined** — shared tasks are rendered directly in the Team page (`app/team/page.tsx`) as a flat list with wiki-linked task names and teammate counts. Not extracted into a separate component. |
+| ~~`SharedTaskItem`~~ | — | — | **Inlined** — individual shared task rows are rendered inline in the Team page. |
 | `TeamPermissionPrompt` | `features/team/components/team-permission-prompt.tsx` | Client | CTA to upgrade token with TP permission |
 
 ## Requirements
@@ -46,10 +46,11 @@ Fetch, cache, and expose the TarkovTracker team progression data as a **first-cl
 - [x] Team page accessible from sidebar navigation (icon: Users)
 - [x] `TeamStateProvider` context wraps the app, exposing `useTeamState()` globally
 - [x] Team data is fetched alongside player data when token has `TP` permission
+- [x] **Reactive token sync**: `TeamStateProvider` must react to token changes from `PlayerStateProvider`. When a user enters their API key for the first time, team data must be fetched automatically without requiring a page reload. Implementation: `TeamStateProvider` consumes `usePlayerState()` to get the current connection status and token, rather than reading localStorage directly on mount.
 - [x] BFF route `/api/tracker/team` proxies `GET /team/progress`
 - [x] Team page shows teammate cards in a responsive grid
-- [x] Each teammate card: display name, level (badge), faction, edition, task completion %, shared task count with player
-- [x] "Shared Tasks" section: tasks that the player AND 1+ teammates both need (displayed as flat list with teammate counts). Task names must be resolved to human-readable names by cross-referencing task IDs against the game data task list from `useGameData()` — never display raw task IDs to the user.
+- [x] Each teammate card: display name, level (badge), faction, shared quest count with player. Edition and overall task completion % are **not shown** — task completion was confusing without context (it showed ALL game tasks, not just relevant ones)
+- [x] "Shared Tasks" section: tasks that the player AND 1+ teammates both need (displayed as flat list with teammate counts). The player's open task set is filtered for **actionability** (prerequisites met, player level sufficient, Fence excluded) before computing shared tasks — blocked quests don't appear. Task names must be resolved to human-readable names by cross-referencing task IDs against the game data task list from `useGameData()` — never display raw task IDs to the user. **Task names must link to the Tarkov wiki** via `task.wikiLink` (from tarkov.dev), opening in a new tab.
 - [ ] Shared tasks grouped by map for easy raid planning
 - [ ] Each shared task shows which teammates need it (avatar/initial bubbles)
 - [x] If token lacks `TP` permission → show upgrade prompt with link to TarkovTracker

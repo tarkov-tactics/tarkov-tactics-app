@@ -13,7 +13,7 @@ const STALE_REPORT_MS = 30 * 60 * 1000; // mirrors ThreatAssessmentCard threshol
 export function useRaidPlan() {
   const { progress, isConnected } = usePlayerState();
   const { teammates } = useTeamState();
-  const { tasks: gameTasks, maps: gameMaps, dataLoaded, isLoading } = useGameData();
+  const { tasks: gameTasks, maps: gameMaps, hideoutStations, dataLoaded, isLoading } = useGameData();
   const { vibeModifier } = useVibeConfig();
   const { latest } = useGoonReports();
 
@@ -36,9 +36,10 @@ export function useRaidPlan() {
       gameMaps,
       vibeModifier,
       teammates,
-      hasGoonSighting
+      hasGoonSighting,
+      hideoutStations,
     );
-  }, [isConnected, progress, dataLoaded, gameTasks, gameMaps, vibeModifier, teammates, hasGoonSighting]);
+  }, [isConnected, progress, dataLoaded, gameTasks, gameMaps, vibeModifier, teammates, hasGoonSighting, hideoutStations]);
 
   return {
     raidPlan: result?.plan ?? null,

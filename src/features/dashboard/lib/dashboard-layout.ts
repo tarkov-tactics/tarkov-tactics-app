@@ -40,20 +40,18 @@ export interface DashboardComposition {
 
 const LOOT_LAYOUT: DashboardComposition = {
   shape: "12col-with-secondary",
-  hero: [{ key: "watchlist", variant: "hero" }],
-  secondary: [{ key: "pois", variant: "hero", sortMode: "priority" }],
+  hero: [{ key: "pois", variant: "hero", sortMode: "priority" }],
+  secondary: [{ key: "watchlist", variant: "hero" }],
   sidebar: [
     { key: "map", variant: "compact" },
     { key: "threat", variant: "compact", format: "rows" },
     { key: "intel" },
-    { key: "loadout", variant: "compact" },
   ],
 };
 
 const QUEST_LAYOUT: DashboardComposition = {
   shape: "2col-split",
   hero: [
-    { key: "loadout", variant: "kit-detailed" },
     { key: "threat", variant: "hero", format: "bars" },
     { key: "intel" },
   ],
@@ -76,7 +74,6 @@ const BOSS_LAYOUT: DashboardComposition = {
   sidebar: [
     { key: "map", variant: "compact" },
     { key: "watchlist", variant: "compact" },
-    { key: "loadout", variant: "kit-categorized" },
   ],
 };
 

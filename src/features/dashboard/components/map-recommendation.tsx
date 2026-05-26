@@ -1,8 +1,15 @@
 "use client";
 
-import { Map as MapIcon, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Map as MapIcon, Users, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import {
+  getRaidStartTimes,
+  formatTarkovTime,
+  isDayTime,
+  TARKOV_MINUTE_MS,
+  type TarkovTime,
+} from "@/lib/tarkov-clock";
 import type { MapRecommendation } from "../lib/types";
 import type { TeamImpact } from "../lib/engine";
 
@@ -21,12 +28,49 @@ function formatDuration(min: number | null | undefined): string | null {
   return `${h}h ${m}min`;
 }
 
+function useTarkovClock() {
+  const [times, setTimes] = useState<[TarkovTime, TarkovTime]>(() =>
+    getRaidStartTimes()
+  );
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimes(getRaidStartTimes());
+    }, TARKOV_MINUTE_MS);
+    return () => clearInterval(interval);
+  }, []);
+
+  return times;
+}
+
+function RaidClocks({ times }: { times: [TarkovTime, TarkovTime] }) {
+  const [t1, t2] = times;
+  const t1Day = isDayTime(t1);
+  const t2Day = isDayTime(t2);
+
+  return (
+    <div className="flex items-center gap-2 text-telemetry text-muted-foreground">
+      <Clock className="size-3 shrink-0" aria-hidden />
+      <span>
+        <span className={t1Day ? "text-amber" : "text-primary"}>
+          {t1Day ? "DAY" : "NIGHT"} {formatTarkovTime(t1)}
+        </span>
+        {" / "}
+        <span className={t2Day ? "text-amber" : "text-primary"}>
+          {t2Day ? "DAY" : "NIGHT"} {formatTarkovTime(t2)}
+        </span>
+      </span>
+    </div>
+  );
+}
+
 export function MapRecommendationCard({
   map,
   teamImpact,
   variant = "compact",
 }: MapRecommendationCardProps) {
   const duration = formatDuration(map.raidDurationMin);
+  const tarkovTimes = useTarkovClock();
   const teamBadge = teamImpact.length > 0 && (
     <Badge
       variant="outline"
@@ -64,6 +108,8 @@ export function MapRecommendationCard({
             </div>
           </div>
 
+          <RaidClocks times={tarkovTimes} />
+
           <p className="text-sm text-muted-foreground leading-relaxed">
             {map.reasoning}
           </p>
@@ -76,14 +122,6 @@ export function MapRecommendationCard({
             {teamBadge}
           </div>
 
-          {/* Visual-only action per spec — no behavior wired up. */}
-          <Button
-            size="sm"
-            className="w-full"
-            aria-label="Clear map (visual only)"
-          >
-            Clear Map
-          </Button>
         </div>
       </div>
     );
@@ -112,6 +150,8 @@ export function MapRecommendationCard({
             )}
           </div>
         </div>
+
+        <RaidClocks times={tarkovTimes} />
 
         <p className="text-xs text-muted-foreground leading-relaxed">
           {map.reasoning}
